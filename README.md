@@ -53,7 +53,8 @@ src/
   map/                   projection, quadtree, routes, canvas scene, NetworkMap
   data/                  india.simplified.json (committed boundaries)
   features/
-    track/               control tower  (phases 3–5)
+    track/               control tower  (phases 3–4)
+    trip/                detail drawer  (phase 5)
     pulse/               analytics      (phase 6)
     system/              living design-system reference at /system
 ```
@@ -313,13 +314,53 @@ honest behaviour: resolving is a statement about the response, not about the roa
 Filter, sort and column visibility persist to `localStorage` and survive a
 reload, as does the last-used board state and the height of the docked table.
 
+## The trip drawer
+
+`/track/TRP-88002` opens the detail cold — selection lives in the URL, so a
+controller can paste a trip at somebody rather than describing it.
+
+**Milestones are planned against actual.** The plan is fixed at generation; the
+actual chain is anchored on when the truck really arrived. A trip running 2h 26m
+behind shows that variance on unloading, POD *and* invoicing — a truck that
+lands late does not magically invoice on time, and that propagation is the point
+of the view.
+
+**The ping trail does not lie.** Stretches where telemetry was dark are drawn as
+their own dashed segments rather than being joined into the solid line. A
+control tower that quietly interpolates across a coverage hole is asserting a
+position nobody reported.
+
+**The e-way countdown runs on the simulation clock**, so pausing freezes it and
+600× burns it down in front of you. It shows validity remaining beside distance
+still to run, because neither number means much alone.
+
+**Reefer traces are deterministic** — a slow wobble inside the contracted band
+plus whatever the scheduled excursions add, ramped in and out rather than
+stepped, which is how a box actually warms. The band is shaded and a breach
+recolours the line.
+
+### Optimistic actions, with real rollback
+
+Notes, agreed ETAs and hand-raised exceptions apply immediately, then wait on a
+simulated round trip and undo themselves if it fails. Verified in the browser:
+the fourth note appeared 150 ms after the click and reverted once the round trip
+came back — 4 notes on screen, then 3.
+
+The failure is deterministic (every fifth outward-facing action) because a demo
+that fails at random is impossible to talk through. One action fails for a
+*reason* instead: calling the driver fails when the vehicle is in a coverage
+hole, which is exactly the situation EX-03 exists to surface.
+
+A hand-raised exception is invisible to its rule — the engine will neither
+refresh nor clear it. Somebody put it there, so somebody takes it away.
+
 ## Tests
 
 ```bash
 npm test
 ```
 
-123 tests. Highlights:
+145 tests. Highlights:
 
 - **Every rule** has hit and miss cases against a hand-built fixture — no
   engine, no clock, no generator.
@@ -336,10 +377,12 @@ npm test
 
 ## Status
 
-Phases 0–4 complete. The control tower is operable: one composable filter drives
-the map, queue, table and KPI strip together; the table is virtualised over the
-full fleet; exceptions can be acknowledged, snoozed and resolved; and Cmd-K
-jumps to any trip, transporter, corridor, exception code or saved view.
+Phases 0–5 complete. The control tower is operable and drills down: one
+composable filter drives the map, queue, table and KPI strip together; the table
+is virtualised over the full fleet; Cmd-K jumps to any trip, transporter,
+corridor, exception code or saved view; and every trip opens a detail drawer
+with its milestone variance, ping trail, telemetry, paperwork and controller
+actions.
 
-Phase 5 adds the trip detail surface, phase 6 the Pulse analytics, phase 7
-accessibility and the performance budget.
+Phase 6 adds the Pulse analytics, phase 7 accessibility and the performance
+budget.

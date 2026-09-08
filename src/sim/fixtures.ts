@@ -1,4 +1,4 @@
-import type { Trip } from "../domain/types";
+import { MILESTONE_SEQUENCE, type Milestone, type MilestoneKey, type Trip } from "../domain/types";
 import type { RuleContext } from "./rules";
 
 /* Fixtures for rule tests. Every rule is pure in (trip, context), so a test is
@@ -10,9 +10,48 @@ const H = 3_600_000;
 /** 08 Sep 2026, 06:40 IST. */
 export const T0 = Date.UTC(2026, 8, 8, 1, 10, 0);
 
+/**
+ * The planned eleven-step chain, shaped like the generator's. A fixture with an
+ * empty milestone list is not a smaller trip, it is an impossible one — and it
+ * hides bugs in anything that reads the plan.
+ */
+function plannedMilestones(
+  dispatchedAt: number,
+  plannedTransitMs: number,
+  detentionOriginH: number,
+  detentionDestH: number,
+): Milestone[] {
+  const gateOut = dispatchedAt;
+  const loadingComplete = gateOut - 1 * H;
+  const gateIn = loadingComplete - detentionOriginH * H;
+  const vehiclePlaced = gateIn - 2 * H;
+  const transporterAccepted = vehiclePlaced - 6 * H;
+  const arrived = gateOut + plannedTransitMs;
+  const unloaded = arrived + detentionDestH * H;
+  const pod = unloaded + 3 * H;
+
+  const at: Record<MilestoneKey, number> = {
+    indent_raised: transporterAccepted - 2 * H,
+    transporter_accepted: transporterAccepted,
+    vehicle_placed: vehiclePlaced,
+    gate_in: gateIn,
+    loading_complete: loadingComplete,
+    gate_out: gateOut,
+    in_transit: gateOut,
+    arrived_destination: arrived,
+    unloading_complete: unloaded,
+    pod_uploaded: pod,
+    invoiced: pod + 24 * H,
+  };
+
+  return MILESTONE_SEQUENCE.map((key) => ({ key, plannedAt: at[key], actualAt: null }));
+}
+
 export function makeTrip(over: Partial<Trip> = {}): Trip {
   const dispatchedAt = over.dispatchedAt ?? T0 - 10 * H;
   const plannedTransitMs = over.plannedTransitMs ?? 42 * H;
+  const detentionOriginH = over.detentionOriginH ?? 2;
+  const detentionDestH = over.detentionDestH ?? 1.5;
 
   return {
     id: "TRP-90001",
@@ -35,9 +74,14 @@ export function makeTrip(over: Partial<Trip> = {}): Trip {
     incidents: [],
     gpsGaps: [],
     excursions: [],
-    detentionOriginH: 2,
-    detentionDestH: 1.5,
-    milestones: [],
+    detentionOriginH,
+    detentionDestH,
+    milestones: plannedMilestones(
+      dispatchedAt,
+      plannedTransitMs,
+      detentionOriginH,
+      detentionDestH,
+    ),
     docs: {
       lrNo: "LR/26/0088214",
       ewayBillNo: "1234 5678 9012",

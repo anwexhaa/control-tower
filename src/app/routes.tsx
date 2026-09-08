@@ -20,11 +20,10 @@ export const ROUTES: Route[] = [
     render: () => <ControlTower />,
   },
   {
-    // Phase 5 replaces this with the trip detail surface.
     pattern: "/track/:tripId",
     title: "Control tower",
     subtitle: "Trip detail",
-    render: () => <ControlTower />,
+    render: (params) => <ControlTower tripId={params.tripId} />,
   },
   {
     pattern: "/pulse",

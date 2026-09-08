@@ -180,6 +180,19 @@ export interface TripException {
   resolutionNote: string | null;
   /** What the rule saw, in the units the controller thinks in. */
   detail: string;
+  /**
+   * Raised by a controller rather than by a rule. The engine never
+   * auto-clears these — a person put it there, a person takes it away.
+   */
+  manual: boolean;
+}
+
+/** A controller's note against a trip. Append-only. */
+export interface TripNote {
+  id: string;
+  at: number;
+  by: string;
+  text: string;
 }
 
 /* ------------------------------------------------------------- documents --- */
@@ -289,6 +302,13 @@ export interface TripState {
   /** The incident currently in force, if any. */
   activeIncident: Incident | null;
   exceptions: TripException[];
+  /**
+   * What a controller has committed to the consignee, when that differs from
+   * what the system projects. The projection is never overwritten — the two
+   * numbers mean different things and a tower needs both.
+   */
+  agreedEtaAt: number | null;
+  notes: TripNote[];
 }
 
 /** The generated fleet. Static: the plan, not the situation. */

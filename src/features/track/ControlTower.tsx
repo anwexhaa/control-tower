@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { num } from "../../domain/format";
 import { NetworkMap } from "../../map/NetworkMap";
+import { navigate } from "../../app/router";
+import { TripDetail } from "../trip/TripDetail";
 import { cx } from "../../lib/cx";
 import { useSim } from "../../store/simStore";
 import { Badge, EmptyState, Panel, PanelBody, PanelHeader, Tooltip } from "../../ui";
@@ -31,12 +33,15 @@ import {
 const MIN_TABLE_H = 140;
 const MAX_TABLE_H = 720;
 
-export function ControlTower() {
+export function ControlTower({ tripId }: { tripId?: string } = {}) {
   const { trips, states, kpis, history, queue, now, tickMs } = useSim();
 
   const [board, setBoard] = useState(() => loadBoard());
   const [views, setViews] = useState<SavedView[]>(() => loadViews());
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // Selection lives in the URL, so /track/TRP-88214 opens the drawer cold and
+  // a controller can paste a trip at somebody rather than describing it.
+  const selectedId = tripId ?? null;
   const [activeTile, setActiveTile] = useState<string | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
 
@@ -85,14 +90,19 @@ export function ControlTower() {
     return queue.filter((q) => allowed.has(q.trip.id));
   }, [queue, filtered, filter]);
 
+  const selectedTrip = selectedId ? (trips.find((t) => t.id === selectedId) ?? null) : null;
+  const selectedState = selectedTrip ? (states.get(selectedTrip.id) ?? null) : null;
+
   const criticalCount = visibleQueue.reduce(
     (n, q) => (q.exception.severity === "critical" ? n + 1 : n),
     0,
   );
 
   const toggleSelected = useCallback(
-    (id: string | null) => setSelectedId((current) => (current === id ? null : id)),
-    [],
+    (id: string | null) => {
+      navigate(id === null || id === selectedId ? "/track" : `/track/${id}`);
+    },
+    [selectedId],
   );
 
   /* ----------------------------------------------------------- command menu */
@@ -284,13 +294,20 @@ export function ControlTower() {
         </Panel>
       </div>
 
+      <TripDetail
+        trip={selectedTrip}
+        state={selectedState}
+        now={now}
+        onClose={() => navigate("/track")}
+      />
+
       <CommandPalette
         open={paletteOpen}
         onClose={() => setPaletteOpen(false)}
         trips={trips}
         views={views}
         onFilter={setFilter}
-        onSelect={(id) => setSelectedId(id)}
+        onSelect={(id) => navigate(`/track/${id}`)}
       />
     </div>
   );

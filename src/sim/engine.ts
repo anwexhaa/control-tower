@@ -4,8 +4,10 @@ import { LANE_BY_ID } from "../domain/lanes";
 import type {
   ExceptionCode,
   Network,
+  Severity,
   Trip,
   TripException,
+  TripNote,
   TripState,
   TripStatus,
 } from "../domain/types";
@@ -31,7 +33,16 @@ const EVENT_CAP = 2000;
  */
 const HISTORY_CAP = 12;
 
-export type SimEventKind = "raised" | "cleared" | "acknowledged" | "resolved" | "dispatched" | "arrived";
+export type SimEventKind =
+  | "raised"
+  | "cleared"
+  | "acknowledged"
+  | "resolved"
+  | "dispatched"
+  | "arrived"
+  | "noted"
+  | "eta_agreed"
+  | "notified";
 
 export interface SimEvent {
   seq: number;
@@ -56,6 +67,9 @@ export class Engine {
   /** Trips that had not rolled yet last step, so dispatch can be logged once. */
   private dispatched = new Set<string>();
   private arrived = new Set<string>();
+  private readonly notes = new Map<string, TripNote[]>();
+  private readonly agreedEta = new Map<string, number>();
+  private noteSeq = 0;
 
   constructor(network: Network) {
     this.network = network;
@@ -92,6 +106,77 @@ export class Engine {
     ex.resolution = "actioned";
     ex.resolutionNote = note ?? null;
     this.log({ at: now, kind: "resolved", tripId, code: ex.code, detail: note });
+  }
+
+  notesFor(tripId: string): TripNote[] {
+    return this.notes.get(tripId) ?? EMPTY_NOTES;
+  }
+
+  addNote(tripId: string, text: string, by: string, now: number): TripNote {
+    const note: TripNote = { id: `n${this.noteSeq++}`, at: now, by, text };
+    const list = this.notes.get(tripId);
+    if (list) list.push(note);
+    else this.notes.set(tripId, [note]);
+    this.log({ at: now, kind: "noted", tripId, detail: text });
+    return note;
+  }
+
+  removeNote(tripId: string, noteId: string): void {
+    const list = this.notes.get(tripId);
+    if (!list) return;
+    const index = list.findIndex((n) => n.id === noteId);
+    if (index >= 0) list.splice(index, 1);
+  }
+
+  /** What the controller has committed, as distinct from what we project. */
+  setAgreedEta(tripId: string, at: number | null, now: number): void {
+    if (at === null) this.agreedEta.delete(tripId);
+    else {
+      this.agreedEta.set(tripId, at);
+      this.log({ at: now, kind: "eta_agreed", tripId });
+    }
+  }
+
+  logNotification(tripId: string, detail: string, now: number): void {
+    this.log({ at: now, kind: "notified", tripId, detail });
+  }
+
+  /** An exception a person put there. Rules never take it away. */
+  raiseManual(
+    tripId: string,
+    code: ExceptionCode,
+    severity: Severity,
+    detail: string,
+    by: string,
+    now: number,
+  ): TripException {
+    const ex: TripException = {
+      id: `${tripId}-${code}-m${this.exceptionSeq++}`,
+      code,
+      severity,
+      raisedAt: now,
+      acknowledgedAt: now,
+      acknowledgedBy: by,
+      snoozedUntil: null,
+      resolvedAt: null,
+      resolution: null,
+      resolutionNote: null,
+      detail,
+      manual: true,
+    };
+    const list = this.byTrip.get(tripId);
+    if (list) list.push(ex);
+    else this.byTrip.set(tripId, [ex]);
+    this.log({ at: now, kind: "raised", tripId, code, detail });
+    return ex;
+  }
+
+  /** Used to roll an optimistic action back when the round trip fails. */
+  dropException(tripId: string, exceptionId: string): void {
+    const list = this.byTrip.get(tripId);
+    if (!list) return;
+    const index = list.findIndex((e) => e.id === exceptionId);
+    if (index >= 0) list.splice(index, 1);
   }
 
   snooze(tripId: string, exceptionId: string, untilMs: number): void {
@@ -171,6 +256,8 @@ export class Engine {
         lastPingAt: ctx.lastPingAt,
         activeIncident,
         exceptions: this.exceptionsFor(trip.id),
+        agreedEtaAt: this.agreedEta.get(trip.id) ?? null,
+        notes: this.notesFor(trip.id),
       });
     }
 
@@ -196,7 +283,11 @@ export class Engine {
       const applicable = rule.appliesTo.includes(lifecycle);
       const hit = applicable ? rule.evaluate(ctx) : null;
 
-      const existing = list?.find((e) => e.code === rule.code && e.resolvedAt === null);
+      // A manual exception is invisible to its rule: a person raised it, so a
+      // rule neither refreshes nor clears it.
+      const existing = list?.find(
+        (e) => e.code === rule.code && e.resolvedAt === null && !e.manual,
+      );
 
       if (hit && !existing) {
         if (!list) {
@@ -216,6 +307,7 @@ export class Engine {
           resolution: null,
           resolutionNote: null,
           detail: hit.detail,
+          manual: false,
         });
         this.log({ at: now, kind: "raised", tripId: trip.id, code: rule.code, detail: hit.detail });
       } else if (hit && existing) {
@@ -241,7 +333,7 @@ export class Engine {
       let toDrop = closed - HISTORY_CAP;
       const kept: TripException[] = [];
       for (const e of list) {
-        if (toDrop > 0 && e.resolvedAt !== null) {
+        if (toDrop > 0 && e.resolvedAt !== null && !e.manual) {
           toDrop--;
           continue;
         }
@@ -256,3 +348,4 @@ export class Engine {
 }
 
 const EMPTY: TripException[] = [];
+const EMPTY_NOTES: TripNote[] = [];

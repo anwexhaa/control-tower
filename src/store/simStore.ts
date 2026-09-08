@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { buildQueue, computeKpis, type Kpis, type QueueItem } from "../domain/kpis";
-import type { Trip, TripState } from "../domain/types";
+import type { ExceptionCode, Severity, Trip, TripState } from "../domain/types";
 import { SimClock, type Speed } from "../sim/clock";
 import { Engine, type SimEvent } from "../sim/engine";
 import { DEFAULT_EPOCH, DEFAULT_SEED, DEFAULT_TRIP_COUNT, generateNetwork } from "../sim/generate";
@@ -165,6 +165,95 @@ class SimStore {
     this.engine.snooze(tripId, exceptionId, this.clock.now() + hours * H);
     this.refresh();
   }
+
+  /* ------------------------------------------------- optimistic controller work
+
+     Each of these applies its change immediately, then waits on a simulated
+     round trip and undoes it if that fails. The controller sees the result of
+     their action at once and only ever waits when something goes wrong, which
+     is the right trade for a screen somebody works all shift.
+
+     The failure is deterministic — every fifth outward-facing action — because
+     a demo that fails at random is impossible to talk through.             */
+
+  private actionSeq = 0;
+
+  private roundTrip(): Promise<boolean> {
+    const willFail = this.actionSeq++ % 5 === 4;
+    return new Promise((resolve) => setTimeout(() => resolve(!willFail), 700));
+  }
+
+  /** Adds a note straight away, removes it again if the write does not land. */
+  async addNote(tripId: string, text: string, by = "A. Raman"): Promise<ActionOutcome> {
+    const note = this.engine.addNote(tripId, text, by, this.clock.now());
+    this.refresh();
+
+    if (await this.roundTrip()) return { ok: true, message: "Note saved" };
+
+    this.engine.removeNote(tripId, note.id);
+    this.refresh();
+    return { ok: false, message: "Could not save the note — it has been rolled back" };
+  }
+
+  /** Commits a revised ETA to the consignee, alongside the projection. */
+  async agreeEta(tripId: string, at: number): Promise<ActionOutcome> {
+    const previous = this.snapshot.states.get(tripId)?.agreedEtaAt ?? null;
+    this.engine.setAgreedEta(tripId, at, this.clock.now());
+    this.refresh();
+
+    if (await this.roundTrip()) return { ok: true, message: "Revised ETA agreed" };
+
+    this.engine.setAgreedEta(tripId, previous, this.clock.now());
+    this.refresh();
+    return { ok: false, message: "Consignee did not confirm — the revision was rolled back" };
+  }
+
+  async raiseException(
+    tripId: string,
+    code: ExceptionCode,
+    severity: Severity,
+    detail: string,
+    by = "A. Raman",
+  ): Promise<ActionOutcome> {
+    const ex = this.engine.raiseManual(tripId, code, severity, detail, by, this.clock.now());
+    this.refresh();
+
+    if (await this.roundTrip()) return { ok: true, message: `${code} raised` };
+
+    this.engine.dropException(tripId, ex.id);
+    this.refresh();
+    return { ok: false, message: `Could not raise ${code} — it has been rolled back` };
+  }
+
+  /**
+   * Reaching the driver depends on the vehicle being reachable. This one fails
+   * for a reason rather than by dice: a truck in a coverage hole cannot be
+   * called, which is exactly the situation EX-03 exists to surface.
+   */
+  async notifyDriver(tripId: string): Promise<ActionOutcome> {
+    const state = this.snapshot.states.get(tripId);
+    const dark = state ? this.clock.now() - state.lastPingAt > 3 * H : false;
+
+    await new Promise((r) => setTimeout(r, 400));
+    if (dark) {
+      return { ok: false, message: "Vehicle is out of coverage — no ping for over 3 hours" };
+    }
+    this.engine.logNotification(tripId, "Driver contacted", this.clock.now());
+    this.refresh();
+    return { ok: true, message: "Driver contacted" };
+  }
+
+  async notifyTransporter(tripId: string, name: string): Promise<ActionOutcome> {
+    this.engine.logNotification(tripId, `Escalated to ${name}`, this.clock.now());
+    this.refresh();
+    await new Promise((r) => setTimeout(r, 400));
+    return { ok: true, message: `${name} notified` };
+  }
+}
+
+export interface ActionOutcome {
+  ok: boolean;
+  message: string;
 }
 
 export const simStore = new SimStore();
