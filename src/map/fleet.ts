@@ -167,9 +167,16 @@ export function drawFleet(
   markers: readonly Marker[],
   view: View,
   palette: PaletteSource,
-  options: { width: number; height: number; selectedId?: string | null; clusterCellPx: number },
+  options: {
+    width: number;
+    height: number;
+    selectedId?: string | null;
+    clusterCellPx: number;
+    /** Suppresses the halo on fresh criticals; never the movement itself. */
+    reducedMotion?: boolean;
+  },
 ): void {
-  const { width, height, selectedId, clusterCellPx } = options;
+  const { width, height, selectedId, clusterCellPx, reducedMotion } = options;
   ctx.clearRect(0, 0, width, height);
 
   const shouldCluster = clusterCellPx > 0;
@@ -215,7 +222,7 @@ export function drawFleet(
     p.lineTo(x - sin * tail - cos * half, y + cos * tail - sin * half);
     p.closePath();
 
-    if (m.fresh) {
+    if (m.fresh && !reducedMotion) {
       halos.moveTo(x + 9, y);
       halos.arc(x, y, 9, 0, Math.PI * 2);
     }

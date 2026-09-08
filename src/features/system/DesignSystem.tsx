@@ -241,12 +241,12 @@ export function DesignSystem() {
             <SearchInput placeholder="Search LR or vehicle…" className="w-[260px]" hint={<KeyHint keys="mod+K" />} />
           </Row>
           <Row label="Select">
-            <Select defaultValue="all" className="w-[180px]">
+            <Select aria-label="Transporter" defaultValue="all" className="w-[180px]">
               <option value="all">All transporters</option>
               <option value="a">Sharda Roadlines</option>
               <option value="b">Deccan Carriers</option>
             </Select>
-            <Select disabled defaultValue="all" className="w-[140px]">
+            <Select aria-label="Disabled example" disabled defaultValue="all" className="w-[140px]">
               <option value="all">Disabled</option>
             </Select>
           </Row>

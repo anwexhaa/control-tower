@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { inrCompact, num, pct } from "../../domain/format";
 import { useSim } from "../../store/simStore";
 import { Panel, PanelBody, PanelHeader, Tooltip } from "../../ui";
+import { ErrorBoundary } from "../../ui/ErrorBoundary";
 import { CostView } from "./CostView";
 import { DelayPareto } from "./DelayPareto";
 import { LaneHeat } from "./LaneHeat";
@@ -110,7 +111,7 @@ export function Pulse() {
               }
             />
             <PanelBody scroll={false}>
-              <Scorecard rows={carriers} />
+              <ErrorBoundary label="Transporter scorecard"><Scorecard rows={carriers} /></ErrorBoundary>
             </PanelBody>
           </Panel>
 
@@ -120,7 +121,7 @@ export function Pulse() {
               subtitle="Which conditions consume the tower"
             />
             <PanelBody scroll={false}>
-              <DelayPareto rows={pareto} />
+              <ErrorBoundary label="Delay Pareto"><DelayPareto rows={pareto} /></ErrorBoundary>
             </PanelBody>
           </Panel>
         </div>
@@ -131,7 +132,9 @@ export function Pulse() {
             subtitle="On-time delivery by four-hour window"
           />
           <PanelBody scroll={false}>
-            <LaneHeat buckets={heat.buckets} rows={heat.rows} />
+            <ErrorBoundary label="Corridor performance">
+              <LaneHeat buckets={heat.buckets} rows={heat.rows} />
+            </ErrorBoundary>
           </PanelBody>
         </Panel>
 
@@ -141,7 +144,9 @@ export function Pulse() {
             subtitle="Freight per billed tonne-kilometre, dearest first"
           />
           <PanelBody scroll={false}>
-            <CostView rows={cost} />
+            <ErrorBoundary label="Cost by corridor">
+              <CostView rows={cost} />
+            </ErrorBoundary>
           </PanelBody>
         </Panel>
       </div>

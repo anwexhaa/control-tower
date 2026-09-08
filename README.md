@@ -58,6 +58,7 @@ src/
     pulse/               analytics      (phase 6)
     system/              living design-system reference at /system
   charts/                shared scale module
+  a11y/                  live region, shortcut sheet, map list view
 ```
 
 ## Design system
@@ -398,6 +399,55 @@ The plan also said these aggregates should derive from the event log. They do
 not, and should not: the log is a capped tail of the last 2,000 events, so it is
 the wrong source for a fleet-wide total. Live state is both complete and cheaper.
 
+## Accessibility and performance
+
+Both are measured rather than asserted, and the numbers live in
+[`PERFORMANCE.md`](PERFORMANCE.md).
+
+| | Budget | Measured |
+| --- | --- | --- |
+| Cold load | under 2 s | **353 ms** |
+| JS, gzipped | under 220 KB | **129.1 KB** |
+| Long tasks over 50 ms at 60× | none | **0 in 25 s** |
+| axe-core violations | none | **0**, three pages, both themes |
+
+Getting to zero long tasks took two changes, and neither was the simulation —
+that costs 2 ms a second. The queue was re-rendering eighty rows of triage
+controls once a second because each row's age label changes; the controls are
+now memoised behind a ref-stable callback, and the queue renders its top thirty.
+A triage queue is worked from the top anyway.
+
+The keyboard work is real, not decorative: the virtualised table uses a roving
+tabindex so Tab steps past it rather than through 1,200 stops, arrows move the
+cursor, and because a row may not be mounted when the cursor reaches it, moving
+scrolls first and focuses after the render. `?` opens the shortcut sheet.
+
+The map has a **list view** reachable by everyone, rather than ARIA bolted onto
+a canvas of 1,100 rotated triangles. New criticals are announced through a
+polite live region — polite because a critical is urgent for the fleet, not
+urgent enough to interrupt a sentence someone is reading.
+
+### One trap worth repeating
+
+axe first reported 23 contrast failures in dark mode that a separate audit
+called clean. It was reading the *light* theme's ink token against a dark
+ground: the rail links carry `transition-colors`, and a tab that is not
+painting never advances a CSS transition, so `getComputedStyle` returns a colour
+frozen mid-switch. **Any automated contrast audit against a UI with colour
+transitions has to freeze them first**, or it reports the theme you left.
+
+## Deploying
+
+```bash
+npm run build     # typecheck, then build to dist/
+npm run preview   # serve the production build locally
+```
+
+`vercel.json` sets the framework, the build command and — the part that is not
+automatic — an **SPA rewrite**. Without it `/track/TRP-88002` works when you
+navigate to it in the app but 404s on a hard refresh or a pasted link, which
+would defeat the point of putting the trip id in the URL.
+
 ## Tests
 
 ```bash
@@ -421,7 +471,7 @@ npm test
 
 ## Status
 
-Phases 0–6 complete. The control tower is operable and drills down: one
+Phases 0–7 complete. The control tower is operable and drills down: one
 composable filter drives the map, queue, table and KPI strip together; the table
 is virtualised over the full fleet; Cmd-K jumps to any trip, transporter,
 corridor, exception code or saved view; and every trip opens a detail drawer
@@ -429,4 +479,4 @@ with its milestone variance, ping trail, telemetry, paperwork and controller
 actions. Pulse turns the same live state into a carrier scorecard, a corridor
 heat table, a delay Pareto and cost per BTKM.
 
-Phase 7 adds accessibility and the performance budget.
+All eight phases are complete.

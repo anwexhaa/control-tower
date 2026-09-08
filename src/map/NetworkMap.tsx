@@ -13,6 +13,8 @@ import { transporterName } from "../domain/transporters";
 import type { Trip, TripState } from "../domain/types";
 import { cx } from "../lib/cx";
 import { Toggle, Tooltip } from "../ui";
+import { MapListView } from "../a11y/MapListView";
+import { usePrefersReducedMotion } from "../lib/motion";
 import { INDIA_SHAPES, MAINLAND_BOUNDS, BOUNDARY_POINTS } from "./geodata";
 import { buildMarkers, drawFleet, readPalette, type Marker } from "./fleet";
 import { fitBounds, screenToLatLng, zoomAbout, WORLD, type View } from "./projection";
@@ -70,6 +72,9 @@ export function NetworkMap({
   const [cursor, setCursor] = useState<{ lat: number; lng: number } | null>(null);
   /** Cost of the last scene draw. Surfaced so the budget is observable. */
   const [drawMs, setDrawMs] = useState(0);
+  /** The map as a list — for screen readers, and for anyone who prefers it. */
+  const [listView, setListView] = useState(false);
+  const reducedMotion = usePrefersReducedMotion();
 
   const fitK = useRef(1);
   const drag = useRef<{ x: number; y: number; moved: number } | null>(null);
@@ -149,7 +154,7 @@ export function NetworkMap({
   useEffect(() => {
     const canvas = canvasRef.current;
     const host = hostRef.current;
-    if (!canvas || !host || !view || size.w === 0) return;
+    if (!canvas || !host || !view || size.w === 0 || listView) return;
 
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     if (canvas.width !== size.w * dpr || canvas.height !== size.h * dpr) {
@@ -178,12 +183,13 @@ export function NetworkMap({
       height: size.h,
       selectedId,
       clusterCellPx,
+      reducedMotion,
     });
 
     // Smoothed so the readout is legible rather than flickering every frame.
     const elapsed = performance.now() - started;
     setDrawMs((prev) => (prev === 0 ? elapsed : prev * 0.8 + elapsed * 0.2));
-  }, [view, markers, size, layers, heat, selectedId, clusterCellPx, themeTick]);
+  }, [view, markers, size, layers, heat, selectedId, clusterCellPx, themeTick, reducedMotion, listView]);
 
   /* --------------------------------------------------------- interaction --- */
 
@@ -303,145 +309,170 @@ export function NetworkMap({
 
   return (
     <div className="relative h-full w-full overflow-hidden">
-      <div
-        ref={hostRef}
-        role="application"
-        aria-label="Live freight network map of India. Arrow keys pan, plus and minus zoom, 0 resets. The trips table below lists every vehicle shown here."
-        tabIndex={0}
-        className="h-full w-full cursor-grab touch-none active:cursor-grabbing focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerLeave={() => {
-          setHover(null);
-          setCursor(null);
-        }}
-        onWheel={onWheel}
-        onKeyDown={onKeyDown}
-      >
-        {/* Geography: static, never re-rendered. Pan and zoom are the transform. */}
-        <svg
-          width={size.w}
-          height={size.h}
-          className="absolute inset-0 block"
-          aria-hidden="true"
-        >
-          <g
-            transform={view ? `translate(${view.tx} ${view.ty}) scale(${view.k})` : undefined}
-          >
-            {INDIA_SHAPES.map((s) => (
-              <path
-                key={s.name}
-                d={s.d}
-                className="fill-sunken stroke-line-strong"
-                strokeWidth={1}
-                vectorEffect="non-scaling-stroke"
-              />
-            ))}
-          </g>
-        </svg>
-
-        <canvas
-          ref={canvasRef}
-          className="pointer-events-none absolute inset-0 block"
-          style={{ width: size.w, height: size.h }}
-          aria-hidden="true"
+      {listView ? (
+        <MapListView
+          trips={trips}
+          states={states}
+          selectedId={selectedId}
+          onSelect={onSelect}
         />
-      </div>
-
-      {/* hover card */}
-      {hover && hoverTrip && hoverState && (
+      ) : (
+        <>
         <div
-          className="pointer-events-none absolute z-20 w-[248px] rounded-sm border border-line bg-raised p-2.5 shadow-lg"
-          style={{
-            left: Math.min(hover.x + 14, Math.max(0, size.w - 258)),
-            top: Math.min(hover.y + 14, Math.max(0, size.h - 130)),
+          ref={hostRef}
+          role="application"
+          aria-label="Live freight network map of India. Arrow keys pan, plus and minus zoom, 0 resets. The trips table below lists every vehicle shown here."
+          tabIndex={0}
+          className="h-full w-full cursor-grab touch-none active:cursor-grabbing focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerLeave={() => {
+            setHover(null);
+            setCursor(null);
           }}
+          onWheel={onWheel}
+          onKeyDown={onKeyDown}
         >
-          <div className="flex items-baseline justify-between gap-2">
-            <span className="font-mono text-[11.5px] font-medium text-ink">
-              {hoverTrip.docs.lrNo}
-            </span>
-            <span className="font-mono text-[10.5px] text-ink-faint tabular-nums">
-              {Math.round(hoverState.progress * 100)}%
-            </span>
-          </div>
-          <p className="mt-0.5 truncate text-[12px] text-ink-soft">
-            {laneLabel(LANE_BY_ID.get(hoverTrip.laneId)!)}
-          </p>
-          <dl className="mt-1.5 grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 text-[11px]">
-            <dt className="text-ink-faint">Transporter</dt>
-            <dd className="truncate text-ink-soft">
-              {transporterName(hoverTrip.transporterCode)}
-            </dd>
-            <dt className="text-ink-faint">Vehicle</dt>
-            <dd className="font-mono text-ink-soft">{hoverTrip.vehicle.regNo}</dd>
-            <dt className="text-ink-faint">ETA</dt>
-            <dd className="font-mono text-ink-soft">{istDateTime(hoverState.etaAt)}</dd>
-            <dt className="text-ink-faint">Against commit</dt>
-            <dd
-              className={cx(
-                "font-mono",
-                hoverState.delayHours > 0 ? "text-warn" : "text-ok",
-              )}
+          {/* Geography: static, never re-rendered. Pan and zoom are the transform. */}
+          <svg
+            width={size.w}
+            height={size.h}
+            className="absolute inset-0 block"
+            aria-hidden="true"
+          >
+            <g
+              transform={view ? `translate(${view.tx} ${view.ty}) scale(${view.k})` : undefined}
             >
-              {hoverState.delayHours > 0
-                ? `+${duration(hoverState.delayHours)}`
-                : `−${duration((hoverTrip.slaCommitAt - hoverState.etaAt) / H)}`}
-            </dd>
-          </dl>
-        </div>
-      )}
+              {INDIA_SHAPES.map((s) => (
+                <path
+                  key={s.name}
+                  d={s.d}
+                  className="fill-sunken stroke-line-strong"
+                  strokeWidth={1}
+                  vectorEffect="non-scaling-stroke"
+                />
+              ))}
+            </g>
+          </svg>
 
-      {/* layer controls */}
-      <div className="absolute top-2 left-2 z-10 rounded-sm border border-line bg-panel/92 p-2 backdrop-blur-sm">
-        <div className="mb-1.5 font-mono text-[9.5px] tracking-[0.11em] text-ink-faint uppercase">
-          Layers
+          <canvas
+            ref={canvasRef}
+            className="pointer-events-none absolute inset-0 block"
+            style={{ width: size.w, height: size.h }}
+            aria-hidden="true"
+          />
         </div>
-        <div className="flex flex-col gap-1.5">
-          {(
-            [
-              ["lanes", "Corridors"],
-              ["nodes", "Plants & ports"],
-              ["labels", "Labels"],
-              ["exceptionsOnly", "Exceptions only"],
-              ["heat", "Delay heat"],
-            ] as const
-          ).map(([key, label]) => (
-            <label key={key} className="flex cursor-pointer items-center gap-2">
-              <Toggle
-                checked={layers[key]}
-                onChange={(v) => setLayers((l) => ({ ...l, [key]: v }))}
-                label={label}
-              />
-              <span className="text-[11.5px] text-ink-soft select-none">{label}</span>
-            </label>
-          ))}
+
+        {/* hover card */}
+        {hover && hoverTrip && hoverState && (
+          <div
+            className="pointer-events-none absolute z-20 w-[248px] rounded-sm border border-line bg-raised p-2.5 shadow-lg"
+            style={{
+              left: Math.min(hover.x + 14, Math.max(0, size.w - 258)),
+              top: Math.min(hover.y + 14, Math.max(0, size.h - 130)),
+            }}
+          >
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="font-mono text-[11.5px] font-medium text-ink">
+                {hoverTrip.docs.lrNo}
+              </span>
+              <span className="font-mono text-[10.5px] text-ink-faint tabular-nums">
+                {Math.round(hoverState.progress * 100)}%
+              </span>
+            </div>
+            <p className="mt-0.5 truncate text-[12px] text-ink-soft">
+              {laneLabel(LANE_BY_ID.get(hoverTrip.laneId)!)}
+            </p>
+            <dl className="mt-1.5 grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 text-[11px]">
+              <dt className="text-ink-faint">Transporter</dt>
+              <dd className="truncate text-ink-soft">
+                {transporterName(hoverTrip.transporterCode)}
+              </dd>
+              <dt className="text-ink-faint">Vehicle</dt>
+              <dd className="font-mono text-ink-soft">{hoverTrip.vehicle.regNo}</dd>
+              <dt className="text-ink-faint">ETA</dt>
+              <dd className="font-mono text-ink-soft">{istDateTime(hoverState.etaAt)}</dd>
+              <dt className="text-ink-faint">Against commit</dt>
+              <dd
+                className={cx(
+                  "font-mono",
+                  hoverState.delayHours > 0 ? "text-warn" : "text-ok",
+                )}
+              >
+                {hoverState.delayHours > 0
+                  ? `+${duration(hoverState.delayHours)}`
+                  : `−${duration((hoverTrip.slaCommitAt - hoverState.etaAt) / H)}`}
+              </dd>
+            </dl>
+          </div>
+        )}
+
+        {/* layer controls */}
+        <div className="absolute top-2 left-2 z-10 rounded-sm border border-line bg-panel/92 p-2 backdrop-blur-sm">
+          <div className="mb-1.5 font-mono text-[9.5px] tracking-[0.11em] text-ink-faint uppercase">
+            Layers
+          </div>
+          <div className="flex flex-col gap-1.5">
+            {(
+              [
+                ["lanes", "Corridors"],
+                ["nodes", "Plants & ports"],
+                ["labels", "Labels"],
+                ["exceptionsOnly", "Exceptions only"],
+                ["heat", "Delay heat"],
+              ] as const
+            ).map(([key, label]) => (
+              <label key={key} className="flex cursor-pointer items-center gap-2">
+                <Toggle
+                  checked={layers[key]}
+                  onChange={(v) => setLayers((l) => ({ ...l, [key]: v }))}
+                  label={label}
+                />
+                <span className="text-[11.5px] text-ink-soft select-none">{label}</span>
+              </label>
+            ))}
+          </div>
         </div>
-      </div>
+        </>
+      )}
 
       {/* readout */}
       <div className="absolute right-2 bottom-2 z-10 flex items-center gap-3 rounded-sm border border-line bg-panel/92 px-2 py-1 font-mono text-[10px] text-ink-faint backdrop-blur-sm">
         <Tooltip label={`${BOUNDARY_POINTS.toLocaleString()} boundary points, simplified`} side="top">
           <span className="tabular-nums">{markers.length} shown</span>
         </Tooltip>
-        <span className="tabular-nums">
-          {view ? `${(view.k / fitK.current).toFixed(1)}×` : "—"}
-        </span>
+        {!listView && (
+          <span className="tabular-nums">
+            {view ? `${(view.k / fitK.current).toFixed(1)}×` : "—"}
+          </span>
+        )}
         <Tooltip label="Canvas scene draw: corridors, nodes and the whole fleet" side="top">
           <span className="tabular-nums" data-draw-ms={drawMs.toFixed(2)}>
             {drawMs.toFixed(1)} ms
           </span>
         </Tooltip>
-        <span className="tabular-nums">
-          {cursor ? `${cursor.lat.toFixed(2)}°N ${cursor.lng.toFixed(2)}°E` : "—"}
-        </span>
+        {!listView && (
+          <span className="tabular-nums">
+            {cursor ? `${cursor.lat.toFixed(2)}°N ${cursor.lng.toFixed(2)}°E` : "—"}
+          </span>
+        )}
+        {!listView && (
+          <button
+            type="button"
+            onClick={resetView}
+            className="text-ink-mute transition-colors hover:text-ink"
+          >
+            Reset
+          </button>
+        )}
         <button
           type="button"
-          onClick={resetView}
+          onClick={() => setListView((v) => !v)}
+          aria-pressed={listView}
           className="text-ink-mute transition-colors hover:text-ink"
         >
-          Reset
+          {listView ? "Map" : "List"}
         </button>
       </div>
     </div>

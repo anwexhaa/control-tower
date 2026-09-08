@@ -6,6 +6,8 @@ import { TripDetail } from "../trip/TripDetail";
 import { cx } from "../../lib/cx";
 import { useSim } from "../../store/simStore";
 import { Badge, EmptyState, Panel, PanelBody, PanelHeader, Tooltip } from "../../ui";
+import { useAnnouncer } from "../../a11y/Announcer";
+import { ErrorBoundary } from "../../ui/ErrorBoundary";
 import { CommandPalette } from "./CommandPalette";
 import { ExceptionQueue } from "./ExceptionQueue";
 import { FilterBar } from "./FilterBar";
@@ -105,6 +107,31 @@ export function ControlTower({ tripId }: { tripId?: string } = {}) {
     [selectedId],
   );
 
+  /* ------------------------------------------------------- announcements */
+
+  const { announce } = useAnnouncer();
+  const announcedRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const fresh = visibleQueue.filter(
+      (q) => q.exception.severity === "critical" && !announcedRef.current.has(q.exception.id),
+    );
+    // Only the arrival is news. Announcing the standing count on every tick
+    // would make the region unusable.
+    if (fresh.length > 0) {
+      for (const q of fresh) announcedRef.current.add(q.exception.id);
+      const first = fresh[0];
+      announce(
+        fresh.length === 1
+          ? `Critical: ${first.exception.detail}, on ${first.trip.docs.lrNo}`
+          : `${fresh.length} new critical exceptions, including ${first.exception.detail} on ${first.trip.docs.lrNo}`,
+      );
+    }
+    // Forget anything that has closed, so a re-raise is announced again.
+    const open = new Set(visibleQueue.map((q) => q.exception.id));
+    for (const id of announcedRef.current) if (!open.has(id)) announcedRef.current.delete(id);
+  }, [visibleQueue, announce]);
+
   /* ----------------------------------------------------------- command menu */
 
   useEffect(() => {
@@ -181,8 +208,10 @@ export function ControlTower({ tripId }: { tripId?: string } = {}) {
           }}
         />
 
-        <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 xl:grid-cols-[1.9fr_1fr]">
-          <Panel>
+        {/* Below 1280 the panes stack and scroll, with the map reduced to a
+            summary band — the table is the surface that still works on a tablet. */}
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-auto xl:grid-cols-[1.9fr_1fr] xl:overflow-visible">
+          <Panel className="max-xl:h-[300px] max-xl:shrink-0">
             <PanelHeader
               title="Live network"
               subtitle={
@@ -202,6 +231,7 @@ export function ControlTower({ tripId }: { tripId?: string } = {}) {
               }
             />
             <PanelBody scroll={false} padded={false}>
+              <ErrorBoundary label="The map">
               <NetworkMap
                 trips={filtered}
                 states={states}
@@ -209,10 +239,11 @@ export function ControlTower({ tripId }: { tripId?: string } = {}) {
                 selectedId={selectedId}
                 onSelect={toggleSelected}
               />
+              </ErrorBoundary>
             </PanelBody>
           </Panel>
 
-          <Panel>
+          <Panel className="max-xl:h-[380px] max-xl:shrink-0">
             <PanelHeader
               title="Exception queue"
               subtitle={`${num(visibleQueue.length)} open · worst first`}
@@ -229,12 +260,14 @@ export function ControlTower({ tripId }: { tripId?: string } = {}) {
                   }
                 />
               ) : (
-                <ExceptionQueue
-                  items={visibleQueue}
-                  now={now}
-                  selectedId={selectedId}
-                  onSelect={toggleSelected}
-                />
+                <ErrorBoundary label="The exception queue">
+                  <ExceptionQueue
+                    items={visibleQueue}
+                    now={now}
+                    selectedId={selectedId}
+                    onSelect={toggleSelected}
+                  />
+                </ErrorBoundary>
               )}
             </PanelBody>
           </Panel>
@@ -245,6 +278,13 @@ export function ControlTower({ tripId }: { tripId?: string } = {}) {
           role="separator"
           aria-orientation="horizontal"
           aria-label="Resize the trips table"
+          /* A focusable separator is a widget, so it has to report its value.
+             Without these axe flags it critical, and a screen reader has no
+             idea what the arrow keys are changing. */
+          aria-valuenow={Math.round(tableHeight)}
+          aria-valuemin={MIN_TABLE_H}
+          aria-valuemax={MAX_TABLE_H}
+          aria-valuetext={`Trips table ${Math.round(tableHeight)} pixels tall`}
           tabIndex={0}
           onPointerDown={onResizeDown}
           onPointerMove={onResizeMove}
@@ -280,6 +320,7 @@ export function ControlTower({ tripId }: { tripId?: string } = {}) {
             }
           />
           <PanelBody scroll={false} padded={false}>
+            <ErrorBoundary label="The trips table">
             <TripTable
               trips={rows}
               states={states}
@@ -290,6 +331,7 @@ export function ControlTower({ tripId }: { tripId?: string } = {}) {
               selectedId={selectedId}
               onSelect={toggleSelected}
             />
+            </ErrorBoundary>
           </PanelBody>
         </Panel>
       </div>

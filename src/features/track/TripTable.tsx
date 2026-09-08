@@ -1,4 +1,4 @@
-import { useEffect, useMemo, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { age, duration, istDateTime } from "../../domain/format";
 import { openCount, worstOpen } from "../../domain/kpis";
 import { LANE_BY_ID, laneLabel } from "../../domain/lanes";
@@ -10,14 +10,16 @@ import type { Sort, SortKey } from "./filters";
 import { STATUS_LABEL, STATUS_TONE } from "./present";
 import { useCssPx, useVirtualRows } from "./useVirtualRows";
 
-/* The full fleet, windowed.
+/* The full fleet, windowed and keyboard-operable.
 
-   Only the rows inside the viewport are mounted — 1,200 rows of eleven cells
-   is roughly 13,000 nodes, which React will mount happily and then scroll like
+   Only the rows inside the viewport are mounted — 1,200 rows of eleven cells is
+   roughly 13,000 nodes, which React will mount happily and then scroll like
    treacle. The scrollbar is kept honest by two spacer rows.
 
-   Row height comes from the density token rather than a constant, so the
-   compact toggle moves the window with it. */
+   Keyboard navigation uses a roving tabindex: exactly one row is tabbable, so
+   Tab moves past the table rather than through 1,200 stops, and the arrows move
+   within it. Because the target row may not be mounted, moving scrolls first
+   and focuses once React has rendered it. */
 
 const SEVERITY_TONE = {
   critical: "crit",
@@ -25,6 +27,9 @@ const SEVERITY_TONE = {
   medium: "info",
   low: "neutral",
 } as const;
+
+/** How long a type-ahead buffer stays alive between keystrokes. */
+const TYPEAHEAD_MS = 900;
 
 export interface Column {
   key: string;
@@ -114,19 +119,117 @@ export function TripTable({
     rowHeight,
   });
 
-  // Selecting on the map should bring the row into view, not leave the user
+  /* --------------------------------------------------- roving focus state */
+
+  const [activeIndex, setActiveIndex] = useState(0);
+  /** Set when a keypress moved the cursor, so focus follows the render. */
+  const wantFocus = useRef(false);
+  const typeahead = useRef({ buffer: "", at: 0 });
+
+  // Clamp when the filter shrinks the list under the cursor.
+  useEffect(() => {
+    setActiveIndex((i) => Math.min(i, Math.max(0, trips.length - 1)));
+  }, [trips.length]);
+
+  const scrollIntoView = useCallback(
+    (index: number) => {
+      const el = scrollRef.current;
+      if (!el) return;
+      const top = index * rowHeight;
+      if (top < el.scrollTop) el.scrollTo({ top });
+      else if (top + rowHeight > el.scrollTop + el.clientHeight) {
+        el.scrollTo({ top: top - el.clientHeight + rowHeight });
+      }
+    },
+    [rowHeight, scrollRef],
+  );
+
+  const moveTo = useCallback(
+    (index: number) => {
+      const clamped = Math.max(0, Math.min(trips.length - 1, index));
+      wantFocus.current = true;
+      setActiveIndex(clamped);
+      scrollIntoView(clamped);
+    },
+    [scrollIntoView, trips.length],
+  );
+
+  // The row may only have just been mounted by the scroll above, so focusing
+  // waits for the render rather than happening in the key handler.
+  useEffect(() => {
+    if (!wantFocus.current) return;
+    const el = scrollRef.current?.querySelector<HTMLElement>(
+      `[data-row-index="${activeIndex}"]`,
+    );
+    if (el) {
+      el.focus({ preventScroll: true });
+      wantFocus.current = false;
+    }
+  }, [activeIndex, win.start, win.end, scrollRef]);
+
+  // Selecting on the map brings the row into view rather than leaving the user
   // hunting for a highlight 900 rows down.
   useEffect(() => {
     if (!selectedId) return;
     const index = trips.findIndex((t) => t.id === selectedId);
-    const el = scrollRef.current;
-    if (index < 0 || !el) return;
-
-    const top = index * rowHeight;
-    if (top < el.scrollTop || top + rowHeight > el.scrollTop + el.clientHeight) {
-      el.scrollTo({ top: Math.max(0, top - el.clientHeight / 2) });
+    if (index >= 0) {
+      setActiveIndex(index);
+      scrollIntoView(index);
     }
-  }, [selectedId, trips, rowHeight, scrollRef]);
+  }, [selectedId, trips, scrollIntoView]);
+
+  const onKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTableSectionElement>) => {
+      switch (e.key) {
+        case "ArrowDown":
+          e.preventDefault();
+          return moveTo(activeIndex + 1);
+        case "ArrowUp":
+          e.preventDefault();
+          return moveTo(activeIndex - 1);
+        case "PageDown":
+          e.preventDefault();
+          return moveTo(activeIndex + 10);
+        case "PageUp":
+          e.preventDefault();
+          return moveTo(activeIndex - 10);
+        case "Home":
+          e.preventDefault();
+          return moveTo(0);
+        case "End":
+          e.preventDefault();
+          return moveTo(trips.length - 1);
+        case "Enter":
+        case " ": {
+          e.preventDefault();
+          const trip = trips[activeIndex];
+          if (trip && onSelect) onSelect(trip.id);
+          return;
+        }
+      }
+
+      // Type-ahead over the LR number and registration — the two things a
+      // controller reads off a phone call.
+      if (e.key.length !== 1 || e.metaKey || e.ctrlKey || e.altKey) return;
+      const nowMs = Date.now();
+      const buffer =
+        nowMs - typeahead.current.at > TYPEAHEAD_MS
+          ? e.key.toLowerCase()
+          : typeahead.current.buffer + e.key.toLowerCase();
+      typeahead.current = { buffer, at: nowMs };
+
+      const found = trips.findIndex(
+        (t) =>
+          t.docs.lrNo.toLowerCase().includes(buffer) ||
+          t.vehicle.regNo.toLowerCase().includes(buffer),
+      );
+      if (found >= 0) {
+        e.preventDefault();
+        moveTo(found);
+      }
+    },
+    [activeIndex, moveTo, onSelect, trips],
+  );
 
   const visible = trips.slice(win.start, win.end);
 
@@ -191,7 +294,7 @@ export function TripTable({
           </tr>
         </thead>
 
-        <tbody>
+        <tbody onKeyDown={onKeyDown}>
           {win.padTop > 0 && (
             <tr aria-hidden="true" style={{ height: win.padTop }}>
               <td colSpan={columns.length} />
@@ -201,28 +304,22 @@ export function TripTable({
           {visible.map((t, i) => {
             const s = states.get(t.id);
             if (!s) return null;
+            const index = win.start + i;
             const isSelected = t.id === selectedId;
 
             return (
               <tr
                 key={t.id}
-                aria-rowindex={win.start + i + 1}
+                data-row-index={index}
+                aria-rowindex={index + 1}
                 aria-selected={isSelected}
-                tabIndex={0}
+                /* Roving: exactly one row is in the tab order. */
+                tabIndex={index === activeIndex ? 0 : -1}
+                onFocus={() => setActiveIndex(index)}
                 onClick={onSelect ? () => onSelect(t.id) : undefined}
-                onKeyDown={
-                  onSelect
-                    ? (e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          onSelect(t.id);
-                        }
-                      }
-                    : undefined
-                }
                 style={{ height: rowHeight }}
                 className={cx(
-                  "border-b border-line-soft",
+                  "border-b border-line-soft outline-offset-[-2px]",
                   onSelect && "cursor-pointer",
                   isSelected ? "bg-accent-soft" : "hover:bg-hover",
                 )}
