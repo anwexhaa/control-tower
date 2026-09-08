@@ -75,7 +75,12 @@ export function PanelBody({
 }) {
   return (
     <div
-      className={cx("min-h-0 flex-1", scroll && "overflow-auto", className)}
+      /* `relative` is load-bearing, not cosmetic. An absolutely positioned
+         descendant resolves its containing block to the nearest *positioned*
+         ancestor — so without this, things like `sr-only` spans deep in a long
+         list anchor to <body> instead, escape the scroll container entirely,
+         and stretch the document to the height of the whole list. */
+      className={cx("relative min-h-0 flex-1", scroll && "overflow-auto", className)}
       style={padded ? { padding: "var(--panel-pad)" } : undefined}
     >
       {children}

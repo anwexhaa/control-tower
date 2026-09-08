@@ -182,7 +182,12 @@
 
 * { box-sizing: border-box; }
 
+/* A fixed-viewport console: the document itself never scrolls, every scroll
+   lives inside a pane. Without this, one pane whose track sizes to content
+   quietly stretches the page and leaves blank space under the app — which is
+   invisible until somebody scrolls. */
 html, body, #root { height: 100%; }
+html, body { overflow: hidden; }
 
 body {
   margin: 0;

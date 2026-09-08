@@ -210,7 +210,7 @@ export function ControlTower({ tripId }: { tripId?: string } = {}) {
 
         {/* Below 1280 the panes stack and scroll, with the map reduced to a
             summary band — the table is the surface that still works on a tablet. */}
-        <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-auto xl:grid-cols-[1.9fr_1fr] xl:overflow-visible">
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-auto xl:grid-cols-[1.9fr_1fr] xl:grid-rows-[minmax(0,1fr)] xl:overflow-hidden">
           <Panel className="max-xl:h-[300px] max-xl:shrink-0">
             <PanelHeader
               title="Live network"
