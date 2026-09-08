@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ControlTowerScaffold } from "../features/track/ControlTowerScaffold";
+import { ControlTower } from "../features/track/ControlTower";
 import { PulseScaffold } from "../features/pulse/PulseScaffold";
 import { ModuleStub } from "../features/ModuleStub";
 import { DesignSystem } from "../features/system/DesignSystem";
@@ -17,14 +17,14 @@ export const ROUTES: Route[] = [
     pattern: "/track",
     title: "Control tower",
     subtitle: "Live shipment monitoring",
-    render: () => <ControlTowerScaffold />,
+    render: () => <ControlTower />,
   },
   {
     // Phase 5 replaces this with the trip detail surface.
     pattern: "/track/:tripId",
     title: "Control tower",
     subtitle: "Trip detail",
-    render: () => <ControlTowerScaffold />,
+    render: () => <ControlTower />,
   },
   {
     pattern: "/pulse",

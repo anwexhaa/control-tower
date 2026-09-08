@@ -62,19 +62,18 @@ export function PanelBody({
   children,
   className,
   scroll = true,
+  /** Off for content that manages its own edges — a table, a map, a list. */
+  padded = true,
 }: {
   children: ReactNode;
   className?: string;
   scroll?: boolean;
+  padded?: boolean;
 }) {
   return (
     <div
-      className={cx(
-        "min-h-0 flex-1",
-        scroll && "overflow-auto",
-        className,
-      )}
-      style={{ padding: "var(--panel-pad)" }}
+      className={cx("min-h-0 flex-1", scroll && "overflow-auto", className)}
+      style={padded ? { padding: "var(--panel-pad)" } : undefined}
     >
       {children}
     </div>
