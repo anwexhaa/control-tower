@@ -3,6 +3,7 @@ import { EXCEPTION_DEFS } from "../../domain/exceptions";
 import { age } from "../../domain/format";
 import type { QueueItem } from "../../domain/kpis";
 import { transporterName } from "../../domain/transporters";
+import { cx } from "../../lib/cx";
 import { Chip, SeverityDot } from "../../ui";
 
 /* Worst first, oldest first inside a band, already-acknowledged items sunk.
@@ -12,10 +13,14 @@ export function ExceptionQueue({
   items,
   now,
   limit = 60,
+  selectedId = null,
+  onSelect,
 }: {
   items: QueueItem[];
   now: number;
   limit?: number;
+  selectedId?: string | null;
+  onSelect?: (tripId: string) => void;
 }) {
   return (
     <div className="flex flex-col">
@@ -25,7 +30,12 @@ export function ExceptionQueue({
         return (
           <article
             key={exception.id}
-            className="flex gap-2.5 border-b border-line-soft px-3 py-2.5 last:border-0 hover:bg-hover"
+            onClick={onSelect ? () => onSelect(trip.id) : undefined}
+            className={cx(
+              "flex gap-2.5 border-b border-line-soft px-3 py-2.5 last:border-0",
+              onSelect && "cursor-pointer",
+              trip.id === selectedId ? "bg-accent-soft" : "hover:bg-hover",
+            )}
           >
             <SeverityDot
               severity={exception.severity}

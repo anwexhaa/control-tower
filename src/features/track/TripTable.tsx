@@ -22,11 +22,15 @@ export function TripTable({
   states,
   now,
   limit = 150,
+  selectedId = null,
+  onSelect,
 }: {
   trips: readonly Trip[];
   states: ReadonlyMap<string, TripState>;
   now: number;
   limit?: number;
+  selectedId?: string | null;
+  onSelect?: (tripId: string) => void;
 }) {
   return (
     <TableWrap className="h-full">
@@ -53,7 +57,11 @@ export function TripTable({
             const open = openCount(s.exceptions);
 
             return (
-              <TR key={t.id}>
+              <TR
+                key={t.id}
+                selected={t.id === selectedId}
+                onClick={onSelect ? () => onSelect(t.id) : undefined}
+              >
                 <TD mono>{t.docs.lrNo}</TD>
                 <TD>{laneLabel(lane)}</TD>
                 <TD>{transporterName(t.transporterCode)}</TD>

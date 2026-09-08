@@ -50,6 +50,8 @@ src/
   ui/                    primitives: Button, Chip, Panel, Field, Overlay,
                          Feedback, Table, KeyHint, icons
   app/                   Shell, Rail, Topbar, router, route table
+  map/                   projection, quadtree, routes, canvas scene, NetworkMap
+  data/                  india.simplified.json (committed boundaries)
   features/
     track/               control tower  (phases 3–5)
     pulse/               analytics      (phase 6)
@@ -193,13 +195,77 @@ costs 2 ms per second, so a worker would buy nothing and cost a serialisation
 boundary. The engine is still a plain class with no DOM dependencies, so the
 seam is there if the fleet ever grows enough to need it.
 
+## The map
+
+No Mapbox, no Leaflet, no tile server. The projection, the renderer and the
+hit-testing are all written here, because dropping in a map library is a
+five-minute task and writing the projection is a different conversation.
+
+### Boundary data
+
+Real Indian state geometry, reduced offline by `scripts/simplify.mjs`:
+
+| | |
+| --- | --- |
+| Source | 36 states, 804 rings, **526,189 points** |
+| Douglas–Peucker | tolerance 0.024° (≈2.7 km) |
+| Committed | 33 states, 41 rings, **6,296 points** |
+| Size | **46.6 KB raw, 18.9 KB gzipped** |
+
+Encoded as delta integers quantised to 0.001° (~110 m), so the file is mostly
+one- and two-digit numbers. At the default fit the tolerance is about 0.6 of a
+screen pixel — invisible until you zoom well in. Chandigarh, Lakshadweep and
+Puducherry fall below the ring-area threshold; none carries a freight node.
+
+### Two layers, one transform
+
+Geography is a **static SVG layer that never re-renders** — pan and zoom are a
+single `transform` attribute on one `<g>`, so the browser composites it rather
+than rebuilding 6,296 points of path data every frame. The fleet, corridors and
+nodes go on a **canvas above it**, because 1,200 markers as DOM nodes will not
+hold 60 fps, and because a node dot should stay 4 px whether you are looking at
+the whole country or one district.
+
+Markers are accumulated into **one `Path2D` per colour and filled four times a
+frame** — no per-marker `save`/`restore`, no per-marker transform. Rotation is
+done by computing the triangle's vertices directly from `sin`/`cos`.
+
+### The quadtree is indexed in world space, not screen space
+
+This is the decision worth pointing at. The obvious build indexes screen
+positions — and then every pan and every zoom invalidates the whole tree, at 60
+Hz. Indexing in **world** coordinates and scaling the query radius by `1/k`
+instead means the tree is rebuilt only when the fleet actually moves, once a
+second.
+
+### Routes are great-circle
+
+Corridors are interpolated along the great circle through their waypoints, not
+drawn as straight Mercator chords. Over 1,600 km a chord visibly cuts the
+corner, and a control tower that puts a Ludhiana–Mumbai truck in the wrong
+state is worse than no map.
+
+### What is measured, and what is not
+
+- **Projection round-trip**: every one of the 70 freight nodes returns to
+  within 0.01° through project → screen → unproject. Asserted in tests.
+- **Quadtree**: agrees with a brute-force scan over 200 random queries against
+  1,200 points, and resolves in well under 1 ms per query. Asserted in tests.
+- **Route geometry**: no drawn corridor exceeds the road distance it
+  represents, and sampling 2,000 points along one never goes backwards.
+- **Sustained 60 fps panning is not machine-verified here.** The automated
+  browser harness reports `visibilityState: hidden`, which throttles timers and
+  `requestAnimationFrame` and suppresses the redraw, so any frame number it
+  produced would be fiction. The map carries a live draw-cost readout in its
+  bottom-right corner instead — open it and pan to see the real number.
+
 ## Tests
 
 ```bash
 npm test
 ```
 
-83 tests. Highlights:
+103 tests. Highlights:
 
 - **Every rule** has hit and miss cases against a hand-built fixture — no
   engine, no clock, no generator.
@@ -216,6 +282,7 @@ npm test
 
 ## Status
 
-Phases 0–2 complete. The board is live: trucks move, ETAs re-project, and
-exceptions raise and clear on their own. The map is still a phase-3 placeholder,
-and the table gets virtualisation, filtering and saved views in phase 4.
+Phases 0–3 complete. The board is live and mapped: trucks move along real
+corridors, ETAs re-project, exceptions raise and clear on their own, and the
+fleet is drawn on a hand-rolled map with hover, selection, clustering and layer
+toggles. The table gets virtualisation, filtering and saved views in phase 4.

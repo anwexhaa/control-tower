@@ -1,7 +1,8 @@
+import { useCallback, useState } from "react";
 import { num } from "../../domain/format";
+import { NetworkMap } from "../../map/NetworkMap";
 import { useSim } from "../../store/simStore";
-import { Badge, Chip, EmptyState, Panel, PanelBody, PanelHeader, Tooltip } from "../../ui";
-import { IconTrack } from "../../ui/icons";
+import { Badge, EmptyState, Panel, PanelBody, PanelHeader, Tooltip } from "../../ui";
 import { ExceptionQueue } from "./ExceptionQueue";
 import { KpiStrip } from "./KpiStrip";
 import { TripTable } from "./TripTable";
@@ -10,6 +11,12 @@ const TABLE_PREVIEW_ROWS = 150;
 
 export function ControlTower() {
   const { trips, states, kpis, queue, now, tickMs } = useSim();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const toggleSelected = useCallback(
+    (id: string | null) => setSelectedId((current) => (current === id ? null : id)),
+    [],
+  );
 
   const criticalCount = queue.reduce(
     (n, q) => (q.exception.severity === "critical" ? n + 1 : n),
@@ -36,16 +43,13 @@ export function ControlTower() {
               </Tooltip>
             }
           />
-          <PanelBody scroll={false} className="grid place-items-center">
-            <EmptyState
-              icon={<IconTrack size={26} />}
-              title="India map renderer"
-              description="Real state boundaries on an SVG layer with the fleet drawn on canvas above it — a hand-written Mercator projection and a quadtree for hit-testing."
-              action={
-                <Chip tone="info" mono>
-                  Phase 03
-                </Chip>
-              }
+          <PanelBody scroll={false} padded={false}>
+            <NetworkMap
+              trips={trips}
+              states={states}
+              now={now}
+              selectedId={selectedId}
+              onSelect={toggleSelected}
             />
           </PanelBody>
         </Panel>
@@ -63,7 +67,12 @@ export function ControlTower() {
                 description="No exception is currently raised against any trip on the board."
               />
             ) : (
-              <ExceptionQueue items={queue} now={now} />
+              <ExceptionQueue
+                items={queue}
+                now={now}
+                selectedId={selectedId}
+                onSelect={toggleSelected}
+              />
             )}
           </PanelBody>
         </Panel>
@@ -80,6 +89,8 @@ export function ControlTower() {
             states={states}
             now={now}
             limit={TABLE_PREVIEW_ROWS}
+            selectedId={selectedId}
+            onSelect={toggleSelected}
           />
         </PanelBody>
       </Panel>
