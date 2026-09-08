@@ -1,12 +1,12 @@
 import { IST_OFFSET_MS } from "./documents";
 import { SEVERITY_RANK } from "./exceptions";
-import type { Trip, TripException } from "./types";
+import type { Trip, TripException, TripState } from "./types";
 
 /* One definition per metric, computed in one place.
 
    The KPI strip, the trip drawer and Pulse all read from here, so the same
-   figure cannot end up computed two different ways in three screens — which
-   is the usual way a dashboard starts quietly lying. */
+   figure cannot end up computed three different ways in three screens — the
+   usual way a dashboard starts quietly lying. */
 
 const H = 3_600_000;
 
@@ -31,19 +31,19 @@ function istDayIndex(ms: number): number {
   return Math.floor((ms + IST_OFFSET_MS) / 86_400_000);
 }
 
-export function isActive(t: Trip): boolean {
-  return t.status === "in_transit" || t.status === "at_risk";
-}
-
-export function delayHours(t: Trip): number {
-  return Math.max(0, (t.etaAt - t.slaCommitAt) / H);
+export function isActiveState(s: TripState): boolean {
+  return s.status === "in_transit" || s.status === "at_risk";
 }
 
 export function isOpen(e: TripException): boolean {
   return e.resolvedAt === null;
 }
 
-export function computeKpis(trips: readonly Trip[], now: number): Kpis {
+export function computeKpis(
+  trips: readonly Trip[],
+  states: ReadonlyMap<string, TripState>,
+  now: number,
+): Kpis {
   const today = istDayIndex(now);
 
   let inTransit = 0;
@@ -56,24 +56,25 @@ export function computeKpis(trips: readonly Trip[], now: number): Kpis {
   let active = 0;
   let visible = 0;
 
-  for (const t of trips) {
-    if (isActive(t)) {
+  for (const trip of trips) {
+    const s = states.get(trip.id);
+    if (!s) continue;
+
+    if (isActiveState(s)) {
       inTransit++;
       active++;
-      if (now - t.lastPingAt <= VISIBILITY_WINDOW_H * H) visible++;
-      if (t.status === "at_risk") atRisk++;
-
-      const d = delayHours(t);
-      if (d > 0) {
+      if (now - s.lastPingAt <= VISIBILITY_WINDOW_H * H) visible++;
+      if (s.status === "at_risk") atRisk++;
+      if (s.delayHours > 0) {
         lateCount++;
-        lateHours += d;
+        lateHours += s.delayHours;
       }
     }
 
-    if (t.status === "delivered" && t.deliveredAt !== null) {
+    if (s.status === "delivered" && s.arrivedAt !== null) {
       delivered++;
-      if (t.deliveredAt <= t.slaCommitAt) deliveredOnTime++;
-      if (istDayIndex(t.deliveredAt) === today) deliveredToday++;
+      if (s.arrivedAt <= trip.slaCommitAt) deliveredOnTime++;
+      if (istDayIndex(s.arrivedAt) === today) deliveredToday++;
     }
   }
 
@@ -96,12 +97,21 @@ export interface QueueItem {
  * The triage queue: open exceptions across the network, worst first, then
  * oldest first inside a severity band. Acknowledged items sink below
  * unacknowledged ones of the same severity — somebody already has those.
+ * Snoozed items drop out until their timer runs down.
  */
-export function buildQueue(trips: readonly Trip[]): QueueItem[] {
+export function buildQueue(
+  trips: readonly Trip[],
+  states: ReadonlyMap<string, TripState>,
+  now: number,
+): QueueItem[] {
   const items: QueueItem[] = [];
   for (const trip of trips) {
-    for (const exception of trip.exceptions) {
-      if (isOpen(exception)) items.push({ trip, exception });
+    const s = states.get(trip.id);
+    if (!s) continue;
+    for (const exception of s.exceptions) {
+      if (!isOpen(exception)) continue;
+      if (exception.snoozedUntil !== null && exception.snoozedUntil > now) continue;
+      items.push({ trip, exception });
     }
   }
 
@@ -121,11 +131,17 @@ export function buildQueue(trips: readonly Trip[]): QueueItem[] {
 }
 
 /** Highest-severity open exception on a trip, for the row-level chip. */
-export function worstOpen(t: Trip): TripException | null {
+export function worstOpen(exceptions: readonly TripException[]): TripException | null {
   let worst: TripException | null = null;
-  for (const e of t.exceptions) {
+  for (const e of exceptions) {
     if (!isOpen(e)) continue;
     if (!worst || SEVERITY_RANK[e.severity] < SEVERITY_RANK[worst.severity]) worst = e;
   }
   return worst;
+}
+
+export function openCount(exceptions: readonly TripException[]): number {
+  let n = 0;
+  for (const e of exceptions) if (isOpen(e)) n++;
+  return n;
 }

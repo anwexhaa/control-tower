@@ -138,20 +138,84 @@ trips** — no plant dispatches on validity it has already burnt. Moving bill
 generation next to dispatch dropped it to 4.2% and brought the board to
 `in_transit` 63.2% · `delivered` 21.9% · `at_risk` 8.1% · `planned` 6.8%.
 
+## The simulation
+
+The fleet moves. A clock decoupled from wall time runs at pause · 1× · 60× ·
+600×, and every derived figure follows it — position, speed, ETA, exceptions,
+KPIs.
+
+### Nothing is accumulated, so nothing drifts
+
+Position is not stepped forward each tick. It is the **integral of an
+hour-of-day road-speed profile** between dispatch and now, evaluated in closed
+form. Trucks crawl out of cities, run well mid-morning, lose the early
+afternoon, and mostly stop overnight — at 600× you watch the fleet stall around
+02:00 IST and surge again after dawn.
+
+Because it is a difference of two integrals rather than a running total,
+stepping in ten-second slices and jumping straight to the answer agree to
+twelve decimal places. Pause, scrub and 600× playback all land on the same
+board. That property is a test, not a claim.
+
+### Exceptions emerge from movement
+
+Trips carry a *plan*, not a status: a pace factor, scheduled incidents, GPS
+dropout windows, reefer excursions. The engine derives everything else.
+
+The ETA projection deliberately only knows about incidents that have **already
+started** — the same information a control tower has. So an ETA does not slip
+in advance of a truck stopping; it slips the moment the truck stops. That one
+constraint is what makes the board feel like an operations screen rather than a
+replay.
+
+All ten rules are pure `(trip, state, instant) => hit | null`. The engine owns
+raising, ageing, clearing and acknowledgement, so a rule cannot depend on how
+often it is called. An exception raises once and then ages in place — `Halted 2h
+10m` becomes `Halted 3h 40m` on the same row — and auto-clears when the
+condition ends, with a ten-minute dwell floor so nothing sitting on a threshold
+flaps.
+
+### Measured, not assumed
+
+| | median | max |
+| --- | --- | --- |
+| `engine.step` (1,200 trips) | 1.72 ms | 7.13 ms |
+| `computeKpis` | 0.09 ms | 1.12 ms |
+| `buildQueue` | 0.19 ms | 1.36 ms |
+| **whole tick** | **2.05 ms** | 9.61 ms |
+
+Zero long tasks over 50 ms in a production build. Dev mode shows ~150 ms spikes
+per tick — that is StrictMode double-rendering the table, not the simulation.
+
+**The planned Web Worker was dropped on this evidence.** The spec called for
+moving the tick off the main thread above ~800 trips; measurement says the tick
+costs 2 ms per second, so a worker would buy nothing and cost a serialisation
+boundary. The engine is still a plain class with no DOM dependencies, so the
+seam is there if the fleet ever grows enough to need it.
+
 ## Tests
 
 ```bash
 npm test
 ```
 
-23 tests covering determinism, the 150 ms generation budget, Rule 138 validity
-including the midnight edge, referential integrity, payload limits, milestone
-ordering, the derived-status invariant, and a sweep asserting no placeholder
-content anywhere in the dataset.
+83 tests. Highlights:
+
+- **Every rule** has hit and miss cases against a hand-built fixture — no
+  engine, no clock, no generator.
+- **Drift**: stepping in ten-second slices equals one big jump to 12 decimals.
+- **Path independence**: a finely-stepped engine and a single-jump engine reach
+  identical progress, ETA, status and arrival.
+- **Raise once**: a standing condition ages in place instead of re-firing.
+- **Dwell floor**: an exception cannot flap open and shut on a threshold.
+- **No unbounded growth**: event log and per-trip closed-exception history are
+  both capped, verified over ten simulated days of flapping telemetry, while an
+  exception that stays open the whole run still survives the cap.
+- Rule 138 validity including the IST-midnight edge, referential integrity,
+  payload limits, and a sweep for placeholder content.
 
 ## Status
 
-Phases 0–1 complete. The control tower now runs on the generated fleet: real
-KPIs, a real severity-ordered exception queue, and a plain trip table. The map
-is still a phase-3 placeholder, and the table gets virtualisation, filtering and
-saved views in phase 4.
+Phases 0–2 complete. The board is live: trucks move, ETAs re-project, and
+exceptions raise and clear on their own. The map is still a phase-3 placeholder,
+and the table gets virtualisation, filtering and saved views in phase 4.

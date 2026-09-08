@@ -169,6 +169,13 @@ export interface TripException {
   acknowledgedBy: string | null;
   snoozedUntil: number | null;
   resolvedAt: number | null;
+  /**
+   * How it ended. "cleared" means the condition went away on its own — the
+   * truck started moving again, the signal came back. "actioned" means a
+   * controller closed it. The distinction matters to Pulse: a network that
+   * self-heals is a different problem from one a team is firefighting.
+   */
+  resolution: "cleared" | "actioned" | null;
   /** What the rule saw, in the units the controller thinks in. */
   detail: string;
 }
@@ -180,7 +187,6 @@ export interface DocumentSet {
   ewayBillNo: string;
   /** Rule 138 validity. Expiry with distance left to run is EX-07. */
   ewayValidUntil: number;
-  ewayDistanceCoveredKm: number;
   invoiceNo: string;
   invoiceValueInr: number;
   weighbridgeSlipNo: string | null;
@@ -193,6 +199,41 @@ export interface DocumentSet {
 
 export type TripStatus = "planned" | "in_transit" | "at_risk" | "delivered";
 
+export type IncidentKind = "breakdown" | "checkpost" | "congestion" | "diversion";
+
+/**
+ * A window in which the truck covers no ground. Scheduled deterministically at
+ * generation, but not known to the control tower until it starts — which is
+ * exactly why an ETA slips: the tower re-projects the moment a truck stops.
+ */
+export interface Incident {
+  at: number;
+  hours: number;
+  kind: IncidentKind;
+  /** Nearest node, for the exception detail line. */
+  where: string;
+}
+
+/** A window in which telemetry goes dark. Drives EX-03. */
+export interface GpsGap {
+  at: number;
+  hours: number;
+}
+
+/** A window in which a reefer drifts outside its permitted band. Drives EX-09. */
+export interface Excursion {
+  at: number;
+  hours: number;
+  /** Degrees above the top of the band. */
+  deltaC: number;
+}
+
+/**
+ * The static plan for a trip. Everything here is fixed at generation; nothing
+ * in it changes as the simulation runs. Where the truck actually is, what its
+ * ETA is now and what is open against it all live in `TripState`, derived from
+ * this plus the clock.
+ */
 export interface Trip {
   id: string;
   laneId: string;
@@ -201,36 +242,58 @@ export interface Trip {
   vehicle: Vehicle;
   driver: Driver;
 
-  status: TripStatus;
-  /** Fraction of the lane covered, 0–1. Position is derived from this. */
-  progress: number;
-
   weightMt: number;
   freightInr: number;
 
   indentedAt: number;
-  dispatchedAt: number | null;
+  /** When the vehicle rolled, or is scheduled to. */
+  dispatchedAt: number;
+  /** Contracted transit, from the lane. */
+  plannedTransitMs: number;
   /** The promised delivery moment the SLA is measured against. */
   slaCommitAt: number;
-  /** Current projection. Re-derived every tick once phase 2 lands. */
-  etaAt: number;
-  deliveredAt: number | null;
 
-  lastPingAt: number;
+  /**
+   * How this truck runs against the profile. Below 1 is a slow combination of
+   * vehicle, driver and road; above 1 makes up time. Independent of incidents.
+   */
+  paceFactor: number;
+  incidents: Incident[];
+  gpsGaps: GpsGap[];
+  /** Empty unless the cargo is temperature-controlled. */
+  excursions: Excursion[];
+
   /** Halted time at origin and destination gates, in hours. */
   detentionOriginH: number;
   detentionDestH: number;
 
   milestones: Milestone[];
-  exceptions: TripException[];
   docs: DocumentSet;
 }
 
-/** The generated snapshot the whole app reads from. */
+/** Everything about a trip that depends on what time it is. */
+export interface TripState {
+  status: TripStatus;
+  /** Fraction of the lane covered, 0–1. Position derives from this. */
+  progress: number;
+  coveredKm: number;
+  /** Instantaneous road speed, zero inside an incident or a night halt. */
+  speedKmph: number;
+  /** Re-projected each tick from the profile ahead and incidents known so far. */
+  etaAt: number;
+  delayHours: number;
+  arrivedAt: number | null;
+  lastPingAt: number;
+  /** The incident currently in force, if any. */
+  activeIncident: Incident | null;
+  exceptions: TripException[];
+}
+
+/** The generated fleet. Static: the plan, not the situation. */
 export interface Network {
   seed: number;
-  /** Simulation "now" the snapshot was built against. */
-  now: number;
+  /** Simulation instant the fleet was built around. */
+  epoch: number;
   trips: Trip[];
   byId: Map<string, Trip>;
 }
