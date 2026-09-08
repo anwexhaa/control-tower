@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { ControlTower } from "../features/track/ControlTower";
-import { PulseScaffold } from "../features/pulse/PulseScaffold";
+import { Pulse } from "../features/pulse/Pulse";
 import { ModuleStub } from "../features/ModuleStub";
 import { DesignSystem } from "../features/system/DesignSystem";
 import { matchPath, type Params } from "./router";
@@ -29,7 +29,7 @@ export const ROUTES: Route[] = [
     pattern: "/pulse",
     title: "Pulse",
     subtitle: "Network performance",
-    render: () => <PulseScaffold />,
+    render: () => <Pulse />,
   },
   {
     pattern: "/system",

@@ -221,10 +221,21 @@ describe("the board at the epoch", () => {
   });
 
   it("steps the whole fleet well inside a frame budget", () => {
+    // Median of many steps, not one sample. A single wall-clock reading on a
+    // shared machine catches a GC pause or a scheduling slip sooner or later
+    // and fails a green build — which teaches everyone to ignore the suite.
     const engine = new Engine(net);
-    engine.step(net.epoch);
-    const start = performance.now();
-    engine.step(net.epoch + H);
-    expect(performance.now() - start).toBeLessThan(8);
+    engine.step(net.epoch); // warm
+
+    const samples: number[] = [];
+    for (let i = 1; i <= 15; i++) {
+      const start = performance.now();
+      engine.step(net.epoch + i * H);
+      samples.push(performance.now() - start);
+    }
+    samples.sort((a, b) => a - b);
+    const median = samples[Math.floor(samples.length / 2)];
+
+    expect(median, `samples: ${samples.map((s) => s.toFixed(2)).join(", ")}`).toBeLessThan(8);
   });
 });

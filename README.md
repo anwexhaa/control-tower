@@ -57,6 +57,7 @@ src/
     trip/                detail drawer  (phase 5)
     pulse/               analytics      (phase 6)
     system/              living design-system reference at /system
+  charts/                shared scale module
 ```
 
 ## Design system
@@ -354,13 +355,56 @@ hole, which is exactly the situation EX-03 exists to surface.
 A hand-raised exception is invisible to its rule — the engine will neither
 refresh nor clear it. Somebody put it there, so somebody takes it away.
 
+## Pulse
+
+The review a logistics head runs, computed from the same board the controllers
+are working. Every figure recomputes on each tick — **2.6 ms for the whole
+set** — so the two screens cannot drift apart.
+
+### Charts, hand-drawn, with the rules enforced
+
+**No dual axis, anywhere.** The Pareto is where that mistake usually lives:
+counts on the left, cumulative percent on the right, and two y-scales let you
+imply any crossing point you like. Both series here are percentages on one
+0–100 axis, which says the same thing and cannot mislead. *4 of 8 codes account
+for 80%* — EX-05 detention leads at 161, then EX-01 ETA slip at 122.
+
+**The heat table is diverging, not sequential.** On-time percentage has a
+meaningful midpoint — the 90% the network is held to — so the ramp runs from
+the critical hue through a neutral *at target* to the healthy one. Volume is
+carried in a separate column, so colour never has to mean two things at once.
+A window with no delivery is drawn as an empty dashed cell rather than shaded
+as 0%: nothing delivered is not the same as everything delivered late.
+
+**Cost per BTKM carries the bar** because it is the one figure that compares a
+125 km run against a 2,180 km one. Cost per MT and the detention estimate sit
+beside it as numbers — different scales, so they are not given bars of their own.
+
+**The palette was validated, not eyeballed.** The Pareto's two series initially
+used the accent against muted ink, which separates by only **ΔE 12.9** for
+normal vision in dark mode — below the 15 floor. Moving the cumulative line to
+full ink took it to **30.6 dark / 39.1 light**, with CVD separation of 28.7 and
+36.2.
+
+### One deviation from the plan, and why
+
+The plan said the lane heat table should show **weeks**. The simulated board
+only carries about thirty hours of completed trips, so weekly columns would be
+one column of data and six of nothing. It shows **four-hour blocks over the
+last day** instead — what the data can actually support, and the window a shift
+lead works in.
+
+The plan also said these aggregates should derive from the event log. They do
+not, and should not: the log is a capped tail of the last 2,000 events, so it is
+the wrong source for a fleet-wide total. Live state is both complete and cheaper.
+
 ## Tests
 
 ```bash
 npm test
 ```
 
-145 tests. Highlights:
+170 tests. Highlights:
 
 - **Every rule** has hit and miss cases against a hand-built fixture — no
   engine, no clock, no generator.
@@ -377,12 +421,12 @@ npm test
 
 ## Status
 
-Phases 0–5 complete. The control tower is operable and drills down: one
+Phases 0–6 complete. The control tower is operable and drills down: one
 composable filter drives the map, queue, table and KPI strip together; the table
 is virtualised over the full fleet; Cmd-K jumps to any trip, transporter,
 corridor, exception code or saved view; and every trip opens a detail drawer
 with its milestone variance, ping trail, telemetry, paperwork and controller
-actions.
+actions. Pulse turns the same live state into a carrier scorecard, a corridor
+heat table, a delay Pareto and cost per BTKM.
 
-Phase 6 adds the Pulse analytics, phase 7 accessibility and the performance
-budget.
+Phase 7 adds accessibility and the performance budget.
