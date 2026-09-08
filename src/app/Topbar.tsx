@@ -1,9 +1,9 @@
-import { useEffect, useRef } from "react";
 import { cx } from "../lib/cx";
 import { SPEEDS, type Speed } from "../sim/clock";
 import { simStore, useSim } from "../store/simStore";
-import { Badge, IconButton, KeyHint, SearchInput, SegmentedControl, Tooltip } from "../ui";
-import { IconBell, IconChevronDown } from "../ui/icons";
+import { Badge, IconButton, KeyHint, SegmentedControl, Tooltip } from "../ui";
+import { IconBell, IconChevronDown, IconSearch } from "../ui/icons";
+import { OPEN_PALETTE } from "../features/track/paletteBus";
 
 const SPEED_LABEL: Record<Speed, string> = {
   0: "❙❙",
@@ -31,18 +31,6 @@ const IST = new Intl.DateTimeFormat("en-IN", {
 
 export function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
   const { now, speed, queue } = useSim();
-  const searchRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        searchRef.current?.focus();
-      }
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
 
   const parts = IST.formatToParts(new Date(now));
   const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
@@ -88,13 +76,20 @@ export function Topbar({ title, subtitle }: { title: string; subtitle?: string }
 
       <div className="flex-1" />
 
-      <SearchInput
-        ref={searchRef}
-        placeholder="Search LR, vehicle, transporter…"
-        aria-label="Search"
-        className="hidden w-[280px] lg:block"
-        hint={<KeyHint keys="mod+K" />}
-      />
+      {/* Opens the command palette rather than being a second search box.
+          The board already has a filter field; two inputs that look alike but
+          do different things is how people end up typing into the wrong one. */}
+      <button
+        type="button"
+        onClick={() => window.dispatchEvent(new CustomEvent(OPEN_PALETTE))}
+        className="hidden h-8.5 w-[280px] items-center gap-2 rounded-sm border border-line bg-panel px-2.5 text-left transition-colors hover:border-line-strong hover:bg-hover lg:flex"
+      >
+        <IconSearch size={15} className="shrink-0 text-ink-faint" />
+        <span className="min-w-0 flex-1 truncate text-[13px] text-ink-faint">
+          Jump to a trip, transporter or view
+        </span>
+        <KeyHint keys="mod+K" />
+      </button>
 
       {/* simulation clock */}
       <div className="hidden items-center gap-2.5 rounded-sm border border-line bg-sunken px-2.5 py-1 md:flex">

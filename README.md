@@ -259,13 +259,67 @@ state is worse than no map.
   produced would be fiction. The map carries a live draw-cost readout in its
   bottom-right corner instead — open it and pan to see the real number.
 
+## The board
+
+### One filter, four panes
+
+The map, the exception queue, the trip table and the KPI strip cannot disagree
+about what the user is looking at, because there is nothing for them to
+disagree with — they all read one `TripFilter` and call the same `matchTrip`.
+
+Every dimension composes: lane AND severity AND transporter AND exception code
+AND free text, simultaneously. Clicking the **At risk** tile narrows all four to
+144 trips; adding a transporter from the command palette takes it to 88, and the
+queue drops from 474 open exceptions to 33 alongside it.
+
+Each active dimension is a removable chip, so there is never a filter in force
+that the user cannot see. The failure mode with faceted filtering is always
+"why is this table empty", and the answer should be on screen.
+
+One detail worth the extra line of code: `codes: ["EX-03"]` combined with
+`severities: ["critical"]` selects **nothing**, because the match requires a
+*single* exception to satisfy both. Plenty of trips carry an EX-03 and a
+separate critical; matching those would be wrong, and it is a test.
+
+### Virtualisation
+
+1,200 rows of eleven cells is roughly 13,000 DOM nodes, which React mounts
+happily and then scrolls like treacle. Only the visible window is mounted —
+**23 rows at 1,200 total** — with two spacer rows keeping the scrollbar honest.
+Row height is read from the `--row-h` density token rather than hardcoded, so
+the compact toggle moves the window with it.
+
+### Sparklines are real history
+
+The KPI strip shows a trailing 24 simulated hours and a delta against the same
+figure a day ago. Rather than filling in over the first few minutes, a
+throwaway engine replays the day before the epoch at startup (~45 ms) and the
+KPIs are captured hourly. It is discarded, so none of its exception state
+leaks into the live board.
+
+### Triage
+
+Acknowledge, snooze (2/6/12 h) and resolve-with-reason are wired to the engine.
+Ageing is shown as colour as well as a number, and the threshold scales with
+severity — a critical that has sat for forty minutes is a worse sign than a low
+that has sat all day.
+
+Resolving by hand records `actioned` rather than `cleared`. If the underlying
+condition is still true the rule raises it again on the next tick, which is the
+honest behaviour: resolving is a statement about the response, not about the road.
+
+### Saved views
+
+Filter, sort and column visibility persist to `localStorage` and survive a
+reload, as does the last-used board state and the height of the docked table.
+
 ## Tests
 
 ```bash
 npm test
 ```
 
-103 tests. Highlights:
+123 tests. Highlights:
 
 - **Every rule** has hit and miss cases against a hand-built fixture — no
   engine, no clock, no generator.
@@ -282,7 +336,10 @@ npm test
 
 ## Status
 
-Phases 0–3 complete. The board is live and mapped: trucks move along real
-corridors, ETAs re-project, exceptions raise and clear on their own, and the
-fleet is drawn on a hand-rolled map with hover, selection, clustering and layer
-toggles. The table gets virtualisation, filtering and saved views in phase 4.
+Phases 0–4 complete. The control tower is operable: one composable filter drives
+the map, queue, table and KPI strip together; the table is virtualised over the
+full fleet; exceptions can be acknowledged, snoozed and resolved; and Cmd-K
+jumps to any trip, transporter, corridor, exception code or saved view.
+
+Phase 5 adds the trip detail surface, phase 6 the Pulse analytics, phase 7
+accessibility and the performance budget.

@@ -85,12 +85,13 @@ export class Engine {
     this.log({ at: now, kind: "acknowledged", tripId, code: ex.code });
   }
 
-  resolve(tripId: string, exceptionId: string, now: number): void {
+  resolve(tripId: string, exceptionId: string, now: number, note?: string): void {
     const ex = this.exceptionsFor(tripId).find((e) => e.id === exceptionId);
     if (!ex || ex.resolvedAt !== null) return;
     ex.resolvedAt = now;
     ex.resolution = "actioned";
-    this.log({ at: now, kind: "resolved", tripId, code: ex.code });
+    ex.resolutionNote = note ?? null;
+    this.log({ at: now, kind: "resolved", tripId, code: ex.code, detail: note });
   }
 
   snooze(tripId: string, exceptionId: string, untilMs: number): void {
@@ -213,6 +214,7 @@ export class Engine {
           snoozedUntil: null,
           resolvedAt: null,
           resolution: null,
+          resolutionNote: null,
           detail: hit.detail,
         });
         this.log({ at: now, kind: "raised", tripId: trip.id, code: rule.code, detail: hit.detail });
@@ -224,6 +226,7 @@ export class Engine {
       } else if (!hit && existing && now - existing.raisedAt >= MIN_DWELL_MS) {
         existing.resolvedAt = now;
         existing.resolution = "cleared";
+        existing.resolutionNote = null;
         this.log({ at: now, kind: "cleared", tripId: trip.id, code: rule.code });
       }
     }

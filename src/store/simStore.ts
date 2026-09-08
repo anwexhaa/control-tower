@@ -12,6 +12,15 @@ import { DEFAULT_EPOCH, DEFAULT_SEED, DEFAULT_TRIP_COUNT, generateNetwork } from
    and it keeps the frame budget for rendering rather than simulation. */
 
 const TICK_MS = 1000;
+const H = 3_600_000;
+
+/** How much history the sparklines show, and how finely it is sampled. */
+const HISTORY_HOURS = 24;
+const HISTORY_STEP_MS = H;
+
+export interface KpiSample extends Kpis {
+  at: number;
+}
 
 export interface SimSnapshot {
   /** Bumped on every tick so useSyncExternalStore knows to re-read. */
@@ -21,6 +30,8 @@ export interface SimSnapshot {
   trips: readonly Trip[];
   states: ReadonlyMap<string, TripState>;
   kpis: Kpis;
+  /** Trailing 24 simulated hours, oldest first. */
+  history: readonly KpiSample[];
   queue: QueueItem[];
   events: readonly SimEvent[];
   /** Wall-clock cost of the last step, surfaced in the UI as a health readout. */
@@ -36,24 +47,54 @@ class SimStore {
   private readonly clock = new SimClock(DEFAULT_EPOCH);
   private readonly engine = new Engine(this.network);
   private readonly listeners = new Set<() => void>();
+  private history: KpiSample[] = [];
+  private lastSampleAt = 0;
   private timer: ReturnType<typeof setInterval> | null = null;
   private version = 0;
   private snapshot: SimSnapshot;
 
   constructor() {
+    this.history = this.backfillHistory();
+    this.lastSampleAt = DEFAULT_EPOCH;
     this.snapshot = this.build(0);
+  }
+
+  /**
+   * The sparklines show real history rather than filling in over the first few
+   * minutes. A throwaway engine replays the day before the epoch and the KPIs
+   * are captured hourly; it is discarded, so none of its exception state
+   * leaks into the live board. Roughly 45 ms at startup.
+   */
+  private backfillHistory(): KpiSample[] {
+    const past = new Engine(this.network);
+    const samples: KpiSample[] = [];
+
+    for (let h = HISTORY_HOURS; h >= 1; h--) {
+      const at = DEFAULT_EPOCH - h * HISTORY_STEP_MS;
+      const states = past.step(at);
+      samples.push({ at, ...computeKpis(this.network.trips, states, at) });
+    }
+    return samples;
   }
 
   private build(tickMs: number): SimSnapshot {
     const now = this.clock.now();
     const states = this.engine.step(now);
+    const kpis = computeKpis(this.network.trips, states, now);
+
+    if (now - this.lastSampleAt >= HISTORY_STEP_MS) {
+      this.lastSampleAt = now;
+      this.history = [...this.history, { at: now, ...kpis }].slice(-HISTORY_HOURS);
+    }
+
     return {
       version: ++this.version,
       now,
       speed: this.clock.getSpeed(),
       trips: this.network.trips,
       states,
-      kpis: computeKpis(this.network.trips, states, now),
+      kpis,
+      history: this.history,
       queue: buildQueue(this.network.trips, states, now),
       events: this.engine.getEvents(),
       tickMs,
@@ -64,11 +105,16 @@ class SimStore {
     for (const l of this.listeners) l();
   }
 
+  private refresh(): void {
+    this.snapshot = this.build(this.snapshot.tickMs);
+    this.emit();
+  }
+
   private tick = (): void => {
     this.clock.advance(performance.now());
     const t0 = performance.now();
-    this.snapshot = this.build(0);
-    this.snapshot = { ...this.snapshot, tickMs: performance.now() - t0 };
+    const next = this.build(0);
+    this.snapshot = { ...next, tickMs: performance.now() - t0 };
     this.emit();
   };
 
@@ -105,29 +151,19 @@ class SimStore {
     this.emit();
   }
 
-  /** Move the clock to a given IST hour today, keeping the fleet consistent. */
-  scrubTo(ms: number): void {
-    this.clock.scrubTo(ms);
-    this.snapshot = this.build(0);
-    this.emit();
-  }
-
   acknowledge(tripId: string, exceptionId: string, by = "A. Raman"): void {
     this.engine.acknowledge(tripId, exceptionId, by, this.clock.now());
-    this.snapshot = this.build(0);
-    this.emit();
+    this.refresh();
   }
 
-  resolve(tripId: string, exceptionId: string): void {
-    this.engine.resolve(tripId, exceptionId, this.clock.now());
-    this.snapshot = this.build(0);
-    this.emit();
+  resolve(tripId: string, exceptionId: string, note?: string): void {
+    this.engine.resolve(tripId, exceptionId, this.clock.now(), note);
+    this.refresh();
   }
 
   snooze(tripId: string, exceptionId: string, hours: number): void {
-    this.engine.snooze(tripId, exceptionId, this.clock.now() + hours * 3_600_000);
-    this.snapshot = this.build(0);
-    this.emit();
+    this.engine.snooze(tripId, exceptionId, this.clock.now() + hours * H);
+    this.refresh();
   }
 }
 

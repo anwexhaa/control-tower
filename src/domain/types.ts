@@ -176,6 +176,8 @@ export interface TripException {
    * self-heals is a different problem from one a team is firefighting.
    */
   resolution: "cleared" | "actioned" | null;
+  /** Why a controller closed it, when they closed it themselves. */
+  resolutionNote: string | null;
   /** What the rule saw, in the units the controller thinks in. */
   detail: string;
 }

@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { cx } from "../lib/cx";
 
 /* Border, fill and shadow are spent by role rather than stamped on everything:
@@ -7,14 +7,17 @@ import { cx } from "../lib/cx";
 export function Panel({
   children,
   className,
+  style,
   as: Tag = "section",
 }: {
   children: ReactNode;
   className?: string;
+  style?: CSSProperties;
   as?: "section" | "div" | "aside";
 }) {
   return (
     <Tag
+      style={style}
       className={cx(
         "flex min-h-0 flex-col overflow-hidden border border-line bg-panel",
         "rounded-md",
