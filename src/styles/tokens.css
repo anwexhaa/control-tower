@@ -1,0 +1,234 @@
+@import "tailwindcss";
+
+/* ============================================================================
+   Control Tower — design tokens
+   ----------------------------------------------------------------------------
+   Two layers, kept deliberately separate:
+
+     1. BRAND      the FreightFox palette, lifted from their own stylesheet.
+                   Action blue #164af3, navy grounds #0d1320 / #1a2038,
+                   mint #0bdfb0. Identity and interaction only.
+
+     2. SEMANTIC   ok / info / warn / crit. Freight state and exception
+                   severity only, never reused for interaction — so anything
+                   red on this screen means a red situation.
+
+   Theming mechanism: the palette is declared inside `@theme static`, which
+   emits every name as a real custom property and has utilities reference it as
+   var(--color-*). The dark block below reassigns those same names, so flipping
+   data-theme reskins the app at runtime.
+
+   `@theme inline` pointing at a second set of raw variables also themes
+   correctly — it compiles to a live var() reference, not a frozen value. It is
+   avoided here only because it does not emit the --color-* names, so raw CSS
+   and arbitrary values like bg-[var(--color-panel)] have nothing to reference,
+   and every token ends up needing two declarations instead of one.
+   ========================================================================== */
+
+@theme static {
+  /* grounds */
+  --color-base:        #f2f5fa;
+  --color-sunken:      #eef1f8;
+  --color-panel:       #ffffff;
+  --color-raised:      #ffffff;
+  --color-hover:       #f0f4fb;
+  --color-active:      #e3ebf9;
+
+  /* strokes */
+  --color-line-soft:   #e8ecf4;
+  --color-line:        #d6dde9;
+  --color-line-strong: #b4c0d6;
+
+  /* Four ink tiers, each clearing 4.5:1 on every ground it is used against.
+     De-emphasis past the fourth tier is done with size and case, not contrast. */
+  --color-ink:         #0d1320;
+  --color-ink-soft:    #3b4560;
+  --color-ink-mute:    #565f7a;
+  --color-ink-faint:   #616b85;
+
+  /* Brand, split by role. `accent` is the accent worn as text, icon or border;
+     `accent-solid` is the fill that carries white on top. On a dark ground one
+     value cannot do both jobs and still clear 4.5:1, hence two tokens. */
+  --color-accent:        #164af3;
+  --color-accent-solid:  #164af3;
+  --color-accent-hover:  #1a3fd8;
+  --color-accent-press:  #14349f;
+  --color-accent-soft:   #e9eefe;
+  --color-accent-line:   #b9cafb;
+  --color-on-accent:     #ffffff;
+
+  /* semantic — freight state & severity */
+  --color-ok:          #06795f;
+  --color-ok-soft:     #e0f5ef;
+  --color-ok-line:     #9fdcca;
+
+  --color-info:        #0a6f96;
+  --color-info-soft:   #e0f1f8;
+  --color-info-line:   #9ed0e4;
+
+  --color-warn:        #9a5804;
+  --color-warn-soft:   #fdf0dc;
+  --color-warn-line:   #ecc78a;
+
+  --color-crit:        #bc2f28;
+  --color-crit-soft:   #fde9e8;
+  --color-crit-line:   #f2b3af;
+
+  --color-idle:        #5b6684;
+  --color-idle-soft:   #eaeef6;
+  --color-idle-line:   #ccd5e5;
+
+  /* elevation */
+  --shadow-sm: 0 1px 2px rgb(13 19 32 / 0.06);
+  --shadow-md: 0 2px 4px rgb(13 19 32 / 0.05), 0 8px 20px -12px rgb(13 19 32 / 0.22);
+  --shadow-lg: 0 4px 8px rgb(13 19 32 / 0.06), 0 24px 48px -24px rgb(13 19 32 / 0.34);
+
+  /* type */
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system,
+               "Segoe UI", Roboto, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo,
+               "Cascadia Mono", monospace;
+
+  /* radii — tight, because this is an instrument panel, not a marketing page */
+  --radius-xs: 2px;
+  --radius-sm: 3px;
+  --radius-md: 5px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+}
+
+/* Non-utility tokens: consumed through raw var() rather than a class. */
+:root {
+  --overlay: rgb(13 19 32 / 0.32);
+}
+
+/* ----------------------------------------------------------------- dark --- */
+/* Reassigns the same names, so every generated utility follows automatically. */
+
+:root[data-theme="dark"] {
+  --color-base:        #070a12;
+  --color-sunken:      #0a0f1b;
+  --color-panel:       #0e1524;
+  --color-raised:      #141c2f;
+  --color-hover:       #182137;
+  --color-active:      #1f2b46;
+
+  --color-line-soft:   #172037;
+  --color-line:        #222d4a;
+  --color-line-strong: #33436d;
+
+  --color-ink:         #e7ecf7;
+  --color-ink-soft:    #a8b4cd;
+  --color-ink-mute:    #8b96b0;
+  --color-ink-faint:   #828ea8;
+
+  --color-accent:        #6a90ff;
+  --color-accent-solid:  #2f5ae6;
+  --color-accent-hover:  #3d68f0;
+  --color-accent-press:  #2749c4;
+  --color-accent-soft:   #121c3c;
+  --color-accent-line:   #2a3f7d;
+  --color-on-accent:     #ffffff;
+
+  --color-ok:          #0bdfb0;
+  --color-ok-soft:     #08292a;
+  --color-ok-line:     #10564d;
+
+  --color-info:        #4cc3ea;
+  --color-info-soft:   #08242f;
+  --color-info-line:   #14505f;
+
+  --color-warn:        #f0a92e;
+  --color-warn-soft:   #2b1f08;
+  --color-warn-line:   #5d4413;
+
+  --color-crit:        #f76b63;
+  --color-crit-soft:   #2d1216;
+  --color-crit-line:   #6a2830;
+
+  --color-idle:        #8b96b0;
+  --color-idle-soft:   #141c2d;
+  --color-idle-line:   #2a3550;
+
+  --overlay: rgb(2 4 9 / 0.66);
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.5);
+  --shadow-md: 0 2px 4px rgb(0 0 0 / 0.4), 0 8px 20px -12px rgb(0 0 0 / 0.7);
+  --shadow-lg: 0 4px 8px rgb(0 0 0 / 0.45), 0 24px 48px -24px rgb(0 0 0 / 0.9);
+}
+
+/* -------------------------------------------------------------- density --- */
+/* A controller reads this screen for a ten-hour shift. Comfortable is the
+   default; compact fits roughly 40% more rows in the same panel.             */
+
+:root,
+:root[data-density="comfortable"] {
+  --row-h:     38px;
+  --row-px:    14px;
+  --data-size: 13.5px;
+  --data-lh:   1.35;
+  --panel-pad: 16px;
+}
+
+:root[data-density="compact"] {
+  --row-h:     28px;
+  --row-px:    10px;
+  --data-size: 12.5px;
+  --data-lh:   1.28;
+  --panel-pad: 12px;
+}
+
+/* ----------------------------------------------------------------- base --- */
+
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--color-base);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Every figure that can sit in a column lines up by default. */
+.tnum, table, input[type="number"] { font-variant-numeric: tabular-nums; }
+
+/* One focus treatment everywhere, never removed without a replacement. */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+:focus:not(:focus-visible) { outline: none; }
+
+::selection { background: var(--color-accent-solid); color: var(--color-on-accent); }
+
+/* Thin scrollbars — a dense console loses real estate to the default ones. */
+* { scrollbar-width: thin; scrollbar-color: var(--color-line-strong) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: var(--color-line-strong);
+  border: 3px solid transparent;
+  border-radius: 100px;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-ink-faint);
+  background-clip: content-box;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@keyframes ct-spin { to { transform: rotate(360deg); } }

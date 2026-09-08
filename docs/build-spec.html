@@ -1,0 +1,1119 @@
+<title>Control Tower Build Spec</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+
+<style>
+  :root {
+    --ground:    #f6f7fa;
+    --surface:   #ffffff;
+    --surface-2: #eef1f7;
+    --ink:       #0d1320;
+    --ink-soft:  #333d57;
+    --muted:     #5b6684;
+    --hairline:  #dde3ee;
+    --hairline-2:#c9d2e4;
+    --accent:    #164af3;
+    --accent-dim:#e8edfe;
+    --positive:  #0a8f72;
+    --positive-dim:#e2f5ef;
+    --warn:      #a95c07;
+    --warn-dim:  #fbeedb;
+    --critical:  #c62b2b;
+    --critical-dim:#fbe9e9;
+    --shadow:    0 1px 2px rgba(13,19,32,.05), 0 8px 24px -16px rgba(13,19,32,.28);
+  }
+
+  :root:not([data-theme="light"]) {
+    color-scheme: light;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --ground:    #090d16;
+      --surface:   #121a2b;
+      --surface-2: #1a2437;
+      --ink:       #e5eaf5;
+      --ink-soft:  #c2cbdf;
+      --muted:     #8b96b2;
+      --hairline:  #222c42;
+      --hairline-2:#33405c;
+      --accent:    #6b90ff;
+      --accent-dim:#16224a;
+      --positive:  #0bdfb0;
+      --positive-dim:#0c2f2a;
+      --warn:      #e3a63f;
+      --warn-dim:  #33270f;
+      --critical:  #f2716b;
+      --critical-dim:#39191c;
+      --shadow:    0 1px 2px rgba(0,0,0,.4), 0 12px 32px -20px rgba(0,0,0,.8);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --ground:    #090d16;
+    --surface:   #121a2b;
+    --surface-2: #1a2437;
+    --ink:       #e5eaf5;
+    --ink-soft:  #c2cbdf;
+    --muted:     #8b96b2;
+    --hairline:  #222c42;
+    --hairline-2:#33405c;
+    --accent:    #6b90ff;
+    --accent-dim:#16224a;
+    --positive:  #0bdfb0;
+    --positive-dim:#0c2f2a;
+    --warn:      #e3a63f;
+    --warn-dim:  #33270f;
+    --critical:  #f2716b;
+    --critical-dim:#39191c;
+    --shadow:    0 1px 2px rgba(0,0,0,.4), 0 12px 32px -20px rgba(0,0,0,.8);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 16px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 0 28px 120px; }
+
+  /* ---------- masthead ---------- */
+
+  .rule-top {
+    border-bottom: 1px solid var(--hairline);
+    background: var(--surface);
+  }
+  .meta-strip {
+    max-width: 1000px; margin: 0 auto; padding: 12px 28px;
+    display: flex; flex-wrap: wrap; gap: 8px 28px; align-items: baseline;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase;
+    color: var(--muted);
+  }
+  .meta-strip b { color: var(--ink-soft); font-weight: 500; }
+  .meta-strip .spacer { flex: 1 1 auto; }
+
+  header.masthead { padding: 68px 0 44px; }
+  .eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 12px; letter-spacing: .16em; text-transform: uppercase;
+    color: var(--accent); margin: 0 0 18px;
+  }
+  h1 {
+    font-family: Archivo, sans-serif; font-weight: 700;
+    font-size: clamp(2.3rem, 5.4vw, 3.5rem);
+    line-height: 1.04; letter-spacing: -.028em;
+    margin: 0 0 20px; text-wrap: balance;
+  }
+  .standfirst {
+    font-size: 1.1rem; color: var(--ink-soft);
+    max-width: 60ch; margin: 0 0 32px;
+  }
+
+  .facts {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1px; background: var(--hairline);
+    border: 1px solid var(--hairline); border-radius: 3px; overflow: hidden;
+  }
+  .fact { background: var(--surface); padding: 14px 16px; }
+  .fact .k {
+    font-family: "IBM Plex Mono", monospace; font-size: 10.5px;
+    letter-spacing: .1em; text-transform: uppercase; color: var(--muted);
+    display: block; margin-bottom: 5px;
+  }
+  .fact .v {
+    font-family: Archivo, sans-serif; font-weight: 600; font-size: 1.02rem;
+    color: var(--ink); font-variant-numeric: tabular-nums; line-height: 1.3;
+  }
+
+  /* ---------- generic sections ---------- */
+
+  section { padding-top: 64px; }
+  h2 {
+    font-family: Archivo, sans-serif; font-weight: 700;
+    font-size: clamp(1.45rem, 2.8vw, 1.95rem);
+    letter-spacing: -.02em; line-height: 1.15;
+    margin: 0 0 10px; text-wrap: balance;
+  }
+  .sec-note { color: var(--muted); max-width: 66ch; margin: 0 0 28px; }
+  h3 {
+    font-family: Archivo, sans-serif; font-weight: 600; font-size: 1.06rem;
+    letter-spacing: -.008em; margin: 0 0 10px;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  a { color: var(--accent); text-underline-offset: 3px; }
+  a:focus-visible, .phase-link:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px;
+  }
+
+  .lede-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(232px, 1fr));
+    gap: 22px; margin-top: 8px;
+  }
+  .lede-grid h3 { margin-bottom: 6px; }
+  .lede-grid p { font-size: .93rem; color: var(--muted); margin: 0; }
+  .lede-grid .tick {
+    display: block; width: 22px; height: 2px; background: var(--accent);
+    margin-bottom: 12px;
+  }
+
+  /* ---------- tables ---------- */
+
+  .tscroll { overflow-x: auto; border: 1px solid var(--hairline); border-radius: 3px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: .875rem; min-width: 560px; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--hairline); vertical-align: top; }
+  thead th {
+    font-family: "IBM Plex Mono", monospace; font-size: 10.5px;
+    letter-spacing: .1em; text-transform: uppercase; color: var(--muted);
+    font-weight: 500; background: var(--surface-2); white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: 0; }
+  td.num, th.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  code, .mono {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .855em; font-variant-numeric: tabular-nums;
+  }
+  td code { color: var(--ink-soft); }
+  .code-cell { background: var(--surface-2); border-radius: 3px; padding: 1px 5px; }
+
+  /* ---------- phase timeline ---------- */
+
+  .phase {
+    position: relative;
+    padding: 0 0 8px 84px;
+    margin-bottom: 40px;
+  }
+  .phase::before {
+    content: ""; position: absolute; left: 25px; top: 34px; bottom: -40px;
+    width: 1px; background: var(--hairline-2);
+  }
+  .phase:last-of-type::before { display: none; }
+  .node {
+    position: absolute; left: 0; top: 2px;
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--surface); border: 1px solid var(--hairline-2);
+    display: grid; place-items: center;
+    font-family: Archivo, sans-serif; font-weight: 700; font-size: 1.02rem;
+    color: var(--accent); font-variant-numeric: tabular-nums;
+    box-shadow: var(--shadow);
+  }
+
+  .phase-head {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px 14px;
+    margin-bottom: 6px;
+  }
+  .phase-head h3 {
+    font-size: 1.32rem; font-weight: 700; letter-spacing: -.018em; margin: 0;
+  }
+  .est {
+    font-family: "IBM Plex Mono", monospace; font-size: 11px;
+    letter-spacing: .07em; text-transform: uppercase; color: var(--muted);
+    border: 1px solid var(--hairline-2); border-radius: 100px; padding: 2px 9px;
+    white-space: nowrap;
+  }
+  .objective { color: var(--ink-soft); margin: 0 0 20px; max-width: 66ch; }
+
+  .panel {
+    background: var(--surface); border: 1px solid var(--hairline);
+    border-radius: 4px; overflow: hidden;
+  }
+  .panel + .panel { margin-top: 14px; }
+  .panel-head {
+    font-family: "IBM Plex Mono", monospace; font-size: 10.5px;
+    letter-spacing: .11em; text-transform: uppercase; color: var(--muted);
+    padding: 9px 16px; border-bottom: 1px solid var(--hairline);
+    background: var(--surface-2);
+  }
+  .panel-body { padding: 14px 16px; }
+  .panel-body > :last-child { margin-bottom: 0; }
+
+  ul.build { list-style: none; margin: 0; padding: 0; }
+  ul.build li {
+    position: relative; padding-left: 22px; margin-bottom: 9px;
+    font-size: .93rem; color: var(--ink-soft); max-width: 68ch;
+  }
+  ul.build li:last-child { margin-bottom: 0; }
+  ul.build li::before {
+    content: ""; position: absolute; left: 2px; top: .55em;
+    width: 9px; height: 9px; border: 1.5px solid var(--hairline-2); border-radius: 2px;
+  }
+  ul.build li b { color: var(--ink); font-weight: 600; }
+
+  ul.checks { list-style: none; margin: 0; padding: 0; }
+  ul.checks li {
+    position: relative; padding-left: 24px; margin-bottom: 8px;
+    font-size: .9rem; color: var(--ink-soft);
+  }
+  ul.checks li:last-child { margin-bottom: 0; }
+  ul.checks li::before {
+    content: "✓"; position: absolute; left: 2px; top: -1px;
+    color: var(--positive); font-weight: 700; font-size: .95rem;
+  }
+
+  .files {
+    font-family: "IBM Plex Mono", monospace; font-size: 12px;
+    line-height: 1.85; color: var(--muted); margin: 0;
+    white-space: pre; overflow-x: auto;
+  }
+  .files b { color: var(--ink-soft); font-weight: 500; }
+
+  .proves {
+    border-left: 2px solid var(--accent);
+    background: var(--accent-dim);
+    padding: 12px 16px; margin-top: 14px; border-radius: 0 3px 3px 0;
+  }
+  .proves .lbl {
+    font-family: "IBM Plex Mono", monospace; font-size: 10.5px;
+    letter-spacing: .11em; text-transform: uppercase; color: var(--accent);
+    display: block; margin-bottom: 4px;
+  }
+  .proves p { margin: 0; font-size: .91rem; color: var(--ink-soft); }
+
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
+  @media (max-width: 720px) { .split { grid-template-columns: 1fr; } }
+
+  /* ---------- chips ---------- */
+
+  .chip {
+    display: inline-block;
+    font-family: "IBM Plex Mono", monospace; font-size: 10.5px;
+    letter-spacing: .07em; text-transform: uppercase;
+    padding: 2px 8px; border-radius: 100px; white-space: nowrap;
+    border: 1px solid transparent;
+  }
+  .chip.crit { color: var(--critical); background: var(--critical-dim); border-color: var(--critical); }
+  .chip.high { color: var(--warn);     background: var(--warn-dim);     border-color: var(--warn); }
+  .chip.med  { color: var(--accent);   background: var(--accent-dim);   border-color: var(--accent); }
+  .chip.low  { color: var(--muted);    background: var(--surface-2);    border-color: var(--hairline-2); }
+
+  /* ---------- manifest nav ---------- */
+
+  .manifest { display: grid; gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 3px; overflow: hidden; }
+  .phase-link {
+    display: grid; grid-template-columns: 44px 1fr auto;
+    align-items: center; gap: 14px;
+    background: var(--surface); padding: 11px 16px;
+    text-decoration: none; color: inherit;
+  }
+  .phase-link:hover { background: var(--surface-2); }
+  .phase-link .pn {
+    font-family: Archivo, sans-serif; font-weight: 700; font-size: .95rem;
+    color: var(--accent); font-variant-numeric: tabular-nums;
+  }
+  .phase-link .pt { font-weight: 500; font-size: .94rem; }
+  .phase-link .pd {
+    font-family: "IBM Plex Mono", monospace; font-size: 11px; color: var(--muted);
+    white-space: nowrap;
+  }
+  @media (max-width: 560px) { .phase-link .pd { display: none; } }
+
+  /* ---------- diagram ---------- */
+
+  figure { margin: 0; }
+  figure svg { display: block; width: 100%; height: auto; }
+  figcaption {
+    font-family: "IBM Plex Mono", monospace; font-size: 11px;
+    color: var(--muted); margin-top: 10px; letter-spacing: .03em;
+  }
+
+  /* ---------- misc ---------- */
+
+  .callout {
+    border: 1px solid var(--hairline); border-left: 2px solid var(--warn);
+    background: var(--surface); border-radius: 0 3px 3px 0;
+    padding: 14px 18px; margin: 0 0 18px;
+  }
+  .callout p { margin: 0; font-size: .93rem; color: var(--ink-soft); }
+  .callout strong { color: var(--ink); }
+
+  footer {
+    margin-top: 76px; padding-top: 22px; border-top: 1px solid var(--hairline);
+    font-family: "IBM Plex Mono", monospace; font-size: 11.5px;
+    color: var(--muted); letter-spacing: .04em;
+    display: flex; flex-wrap: wrap; gap: 6px 22px;
+  }
+
+  @media (max-width: 640px) {
+    .wrap { padding: 0 18px 80px; }
+    .phase { padding-left: 0; }
+    .phase::before { display: none; }
+    .node { position: static; margin-bottom: 14px; width: 44px; height: 44px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  }
+  html { scroll-behavior: smooth; }
+</style>
+
+<div class="rule-top">
+  <div class="meta-strip">
+    <span><b>Project</b> &nbsp;Control Tower</span>
+    <span><b>Target</b> &nbsp;FreightFox — Frontend</span>
+    <span><b>Stack</b> &nbsp;React 19 · TS · Vite · Tailwind</span>
+    <span class="spacer"></span>
+    <span><b>Rev</b> &nbsp;01 · 08 Sep 2026</span>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow">Build specification</p>
+    <h1>Control Tower</h1>
+    <p class="standfirst">
+      A live freight command centre for Indian enterprise logistics — built as a portfolio
+      piece for FreightFox. This document is the build plan: eight phases, what ships in
+      each, and how we know a phase is done.
+    </p>
+
+    <div class="facts">
+      <div class="fact"><span class="k">Phases</span><span class="v">8</span></div>
+      <div class="fact"><span class="k">Est. build</span><span class="v">11 days</span></div>
+      <div class="fact"><span class="k">Simulated trips</span><span class="v">1,200</span></div>
+      <div class="fact"><span class="k">Runtime deps</span><span class="v">2</span></div>
+      <div class="fact"><span class="k">Exception rules</span><span class="v">10</span></div>
+    </div>
+  </header>
+
+  <!-- ============ WHY ============ -->
+  <section id="why">
+    <h2>Why this, and not a landing page</h2>
+    <p class="sec-note">
+      Three findings from FreightFox's public footprint shaped the choice of what to build.
+    </p>
+
+    <div class="lede-grid">
+      <div>
+        <span class="tick"></span>
+        <h3>Their site is Webflow</h3>
+        <p>
+          freightfox.ai runs on Webflow with HubSpot forms. No engineer wrote that frontend,
+          so rebuilding it demonstrates nothing to the person reviewing the application.
+        </p>
+      </div>
+      <div>
+        <span class="tick"></span>
+        <h3>The product is private</h3>
+        <p>
+          <code>app.freightfox.ai</code> returns 404. Nobody outside the company has seen the
+          TMS. Anything built here is an interpretation, not a copy — and it forces the
+          reader to picture the candidate on the team.
+        </p>
+      </div>
+      <div>
+        <span class="tick"></span>
+        <h3>Track is the hard surface</h3>
+        <p>
+          Of six modules, the control tower carries the heaviest frontend load: live
+          positions, dense tables, exception triage, sub-second interaction on thousands
+          of rows. It is the strongest answer to “can you handle complexity”.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ WHAT ============ -->
+  <section id="product">
+    <h2>What the product is</h2>
+    <p>
+      A single-screen operations console for a national logistics manager at a manufacturer
+      moving full-truckload freight across India. It answers one question continuously:
+      <strong>which of my shipments need attention right now, and why.</strong>
+    </p>
+    <p>
+      Everything runs client-side against a deterministic simulation. There is no backend —
+      a seeded generator produces a fleet, and a tick engine advances it through real
+      geography in accelerated time, raising exceptions from the same rules a real control
+      tower uses.
+    </p>
+
+    <figure style="margin-top:26px">
+      <svg viewBox="0 0 900 224" role="img" aria-label="Data flow: seeded generator feeds the simulation engine, which advances trip state on a tick loop; a rules engine derives exceptions; a selector layer feeds the map, table, exception queue and analytics views.">
+        <defs>
+          <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+          </marker>
+        </defs>
+        <g style="color:var(--hairline-2)" stroke="currentColor" stroke-width="1.25" fill="none" marker-end="url(#ar)">
+          <path d="M150,52 H208"/>
+          <path d="M310,52 H368"/>
+          <path d="M470,52 V88 H262 V116"/>
+          <path d="M470,52 H528"/>
+          <path d="M262,158 V186 H352"/>
+          <path d="M630,52 V186 H580" />
+        </g>
+
+        <g font-family="IBM Plex Mono, monospace" font-size="11.5">
+          <g>
+            <rect x="8" y="30" width="142" height="44" rx="3" fill="var(--surface)" stroke="var(--hairline-2)"/>
+            <text x="79" y="49" text-anchor="middle" fill="var(--ink)" font-weight="600">seed(42)</text>
+            <text x="79" y="64" text-anchor="middle" fill="var(--muted)" font-size="10.5">lanes · fleet · SKUs</text>
+          </g>
+          <g>
+            <rect x="208" y="30" width="102" height="44" rx="3" fill="var(--surface)" stroke="var(--hairline-2)"/>
+            <text x="259" y="49" text-anchor="middle" fill="var(--ink)" font-weight="600">generator</text>
+            <text x="259" y="64" text-anchor="middle" fill="var(--muted)" font-size="10.5">1,200 trips</text>
+          </g>
+          <g>
+            <rect x="368" y="30" width="102" height="44" rx="3" fill="var(--accent-dim)" stroke="var(--accent)"/>
+            <text x="419" y="49" text-anchor="middle" fill="var(--ink)" font-weight="600">tick engine</text>
+            <text x="419" y="64" text-anchor="middle" fill="var(--muted)" font-size="10.5">1 Hz · 600×</text>
+          </g>
+          <g>
+            <rect x="528" y="30" width="102" height="44" rx="3" fill="var(--surface)" stroke="var(--hairline-2)"/>
+            <text x="579" y="49" text-anchor="middle" fill="var(--ink)" font-weight="600">rules</text>
+            <text x="579" y="64" text-anchor="middle" fill="var(--muted)" font-size="10.5">EX-01…EX-10</text>
+          </g>
+          <g>
+            <rect x="196" y="116" width="132" height="42" rx="3" fill="var(--surface)" stroke="var(--hairline-2)"/>
+            <text x="262" y="134" text-anchor="middle" fill="var(--ink)" font-weight="600">store</text>
+            <text x="262" y="148" text-anchor="middle" fill="var(--muted)" font-size="10.5">selectors · memo</text>
+          </g>
+
+          <g fill="var(--surface)" stroke="var(--hairline-2)">
+            <rect x="352" y="166" width="98" height="40" rx="3"/>
+            <rect x="462" y="166" width="98" height="40" rx="3"/>
+            <rect x="572" y="166" width="98" height="40" rx="3"/>
+            <rect x="682" y="166" width="98" height="40" rx="3"/>
+          </g>
+          <g text-anchor="middle" fill="var(--ink)" font-size="11">
+            <text x="401" y="191">map</text>
+            <text x="511" y="191">table</text>
+            <text x="621" y="191">queue</text>
+            <text x="731" y="191">pulse</text>
+          </g>
+        </g>
+      </svg>
+      <figcaption>Data flow — one source of truth, four views, zero network calls.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ============ MANIFEST ============ -->
+  <section id="manifest">
+    <h2>Phase manifest</h2>
+    <p class="sec-note">
+      Phases run in order; each depends on the one before it. Phases 0–4 produce a
+      demoable product on their own — 5–7 are what make it look finished.
+    </p>
+    <nav class="manifest" aria-label="Phase list">
+      <a class="phase-link" href="#p0"><span class="pn">00</span><span class="pt">Foundation &amp; design system</span><span class="pd">1 d</span></a>
+      <a class="phase-link" href="#p1"><span class="pn">01</span><span class="pt">Domain model &amp; seed data</span><span class="pd">1 d</span></a>
+      <a class="phase-link" href="#p2"><span class="pn">02</span><span class="pt">Simulation &amp; rules engine</span><span class="pd">1.5 d</span></a>
+      <a class="phase-link" href="#p3"><span class="pn">03</span><span class="pt">India map renderer</span><span class="pd">2 d</span></a>
+      <a class="phase-link" href="#p4"><span class="pn">04</span><span class="pt">The control tower screen</span><span class="pd">2 d</span></a>
+      <a class="phase-link" href="#p5"><span class="pn">05</span><span class="pt">Trip detail &amp; documents</span><span class="pd">1 d</span></a>
+      <a class="phase-link" href="#p6"><span class="pn">06</span><span class="pt">Pulse — performance analytics</span><span class="pd">1 d</span></a>
+      <a class="phase-link" href="#p7"><span class="pn">07</span><span class="pt">Accessibility, perf &amp; ship</span><span class="pd">1.5 d</span></a>
+    </nav>
+  </section>
+
+  <!-- ============ PHASES ============ -->
+  <section id="phases">
+    <h2>The phases</h2>
+    <p class="sec-note">
+      Each phase lists what gets built, which files appear, and the checkpoints that must
+      pass before moving on.
+    </p>
+
+    <!-- P0 -->
+    <article class="phase" id="p0">
+      <div class="node">00</div>
+      <div class="phase-head">
+        <h3>Foundation &amp; design system</h3>
+        <span class="est">1 day</span>
+      </div>
+      <p class="objective">
+        Stand up the shell and the visual language before any feature work, so every later
+        phase composes instead of restyling.
+      </p>
+
+      <div class="panel">
+        <div class="panel-head">Build</div>
+        <div class="panel-body">
+          <ul class="build">
+            <li><b>Tokens</b> — port FreightFox's own palette from their CSS: <code>#164af3</code> action blue, <code>#0d1320</code>/<code>#1a2038</code> navy grounds, <code>#0bdfb0</code> mint. Add a semantic layer on top (<code>ok</code> / <code>watch</code> / <code>risk</code> / <code>breach</code>) kept deliberately separate from the brand accent.</li>
+            <li><b>Density scale</b> — a control room is read at arm's length across a 10-hour shift. Set a 4px base grid, 13px table type, 1.35 line-height for data, and a <code>comfortable</code> / <code>compact</code> toggle.</li>
+            <li><b>App shell</b> — persistent left rail carrying the six FreightFox modules (Procure · Execute · Track · Settle · Pulse · Decarbonize) with Track live and the rest visibly stubbed; top bar with org switcher, sim clock, and speed control.</li>
+            <li><b>Primitives</b> — Button, IconButton, Chip, SeverityDot, Badge, Card, Drawer, Modal, Select, Combobox, DateRange, Tooltip, Toast, Skeleton, EmptyState, KeyHint.</li>
+            <li><b>Routing</b> — file-light hash-free routing via React Router: <code>/track</code>, <code>/track/:tripId</code>, <code>/pulse</code>.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="split">
+        <div class="panel">
+          <div class="panel-head">Files</div>
+          <div class="panel-body">
+            <p class="files"><b>src/</b>
+  <b>styles/</b>tokens.css
+  <b>ui/</b>button.tsx · chip.tsx
+     drawer.tsx · table.tsx
+  <b>app/</b>shell.tsx · rail.tsx
+     topbar.tsx · routes.tsx</p>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head">Done when</div>
+          <div class="panel-body">
+            <ul class="checks">
+              <li>Shell renders at 1280 and 1920 with no layout shift</li>
+              <li>Every primitive has hover, focus-visible and disabled states</li>
+              <li>Light and dark both pass 4.5:1 on body text</li>
+              <li>Zero hardcoded hex outside <code>tokens.css</code></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="proves">
+        <span class="lbl">Signal</span>
+        <p>That you start from a system, not from screens — the thing that separates a frontend engineer from someone who styles components one at a time.</p>
+      </div>
+    </article>
+
+    <!-- P1 -->
+    <article class="phase" id="p1">
+      <div class="node">01</div>
+      <div class="phase-head">
+        <h3>Domain model &amp; seed data</h3>
+        <span class="est">1 day</span>
+      </div>
+      <p class="objective">
+        Model Indian FTL freight accurately enough that someone from the industry reads the
+        screen and recognises their own job. This phase is where the project earns its
+        credibility.
+      </p>
+
+      <div class="panel">
+        <div class="panel-head">Build</div>
+        <div class="panel-body">
+          <ul class="build">
+            <li><b>Types</b> — <code>Trip</code>, <code>Lane</code>, <code>Node</code> (plant / CFS / warehouse / dealer), <code>Transporter</code>, <code>Vehicle</code>, <code>Driver</code>, <code>Consignment</code>, <code>Milestone</code>, <code>Ping</code>, <code>Exception</code>, <code>Document</code>.</li>
+            <li><b>Geography</b> — 60 real freight nodes with coordinates: Bhiwandi, Gurugram, Hosur, Dahej, Jamshedpur, Sanand, Pantnagar, Guwahati, Vizag, Ludhiana, Nagpur, Kolkata and more.</li>
+            <li><b>Lanes</b> — 45 corridors with real road distances and transit norms, e.g. Bhiwandi → Bengaluru 985 km / 42 h, Ludhiana → Mumbai 1,630 km / 68 h, Dahej → Bhiwandi 385 km / 18 h.</li>
+            <li><b>Fleet</b> — Indian FTL vehicle classes with correct payloads: 32 ft SXL (9 MT), 32 ft MXL (15 MT), 22 ft container (10 MT), 20/24/28/32 MT trailers, reefer, tanker, tipper.</li>
+            <li><b>Documents</b> — LR number, e-way bill with Rule 138 validity (one day per 200 km), GST invoice, weighbridge slip, POD.</li>
+            <li><b>Seeded PRNG</b> — mulberry32 so every reload produces the identical fleet. A demo that reshuffles on refresh cannot be talked through in an interview.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">Milestone sequence — every trip advances through these</div>
+        <div class="panel-body">
+          <p class="files">indent raised → transporter accepted → vehicle placed → gate-in
+  → loading complete → gate-out / dispatch → in transit
+  → arrived at destination → unloading → POD uploaded → invoiced</p>
+        </div>
+      </div>
+
+      <div class="split">
+        <div class="panel">
+          <div class="panel-head">Files</div>
+          <div class="panel-body">
+            <p class="files"><b>src/domain/</b>
+  types.ts
+  nodes.ts · lanes.ts
+  fleet.ts · transporters.ts
+  documents.ts
+<b>src/sim/</b>rng.ts · generate.ts</p>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head">Done when</div>
+          <div class="panel-body">
+            <ul class="checks">
+              <li>1,200 trips generate in under 150 ms</li>
+              <li>Same seed → byte-identical output</li>
+              <li>Status mix is plausible: ~62% in transit, ~22% delivered, ~9% at risk, ~7% not started</li>
+              <li>No placeholder strings anywhere in the dataset</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="proves">
+        <span class="lbl">Signal</span>
+        <p>Domain literacy. Anyone can build a table of fake rows; e-way bill validity and 32 ft SXL payloads say you researched the customer.</p>
+      </div>
+    </article>
+
+    <!-- P2 -->
+    <article class="phase" id="p2">
+      <div class="node">02</div>
+      <div class="phase-head">
+        <h3>Simulation &amp; rules engine</h3>
+        <span class="est">1.5 days</span>
+      </div>
+      <p class="objective">
+        Make the fleet move, and make problems emerge from movement rather than being
+        hardcoded. This is what turns a mockup into something that behaves.
+      </p>
+
+      <div class="panel">
+        <div class="panel-head">Build</div>
+        <div class="panel-body">
+          <ul class="build">
+            <li><b>Clock</b> — a simulation clock decoupled from wall time, with pause · 1× · 60× · 600× and a scrubbable 24-hour dial. Ticks at 1 Hz regardless of speed; each tick advances sim-time by the multiplier.</li>
+            <li><b>Movement</b> — trucks interpolate along a lane polyline using great-circle distance, modulated by a speed profile: highway 45 km/h average, night-halt windows, city-entry slowdown, and a per-trip variance draw.</li>
+            <li><b>ETA model</b> — remaining distance ÷ trailing average speed, re-projected every tick, with the delta against SLA committed time surfaced as the delay figure.</li>
+            <li><b>Rules engine</b> — pure functions <code>(trip, now) =&gt; Exception[]</code>, evaluated per tick, debounced so an exception raises once and then ages rather than re-firing.</li>
+            <li><b>Event log</b> — append-only stream of every state change, which later feeds the trip timeline and the analytics phase.</li>
+            <li><b>Web Worker</b> — move the tick loop off the main thread once trip count crosses ~800, so panning the map never stutters the simulation.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">Exception taxonomy</div>
+        <div class="tscroll">
+          <table>
+            <thead>
+              <tr><th>Code</th><th>Exception</th><th>Trigger condition</th><th>Severity</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>EX-01</code></td><td>ETA slip</td><td>Projected arrival exceeds SLA commit</td><td><span class="chip high">High</span></td></tr>
+              <tr><td><code>EX-02</code></td><td>Unplanned stoppage</td><td>Speed ≈ 0 for &gt; 120 min outside a known halt</td><td><span class="chip med">Medium</span></td></tr>
+              <tr><td><code>EX-03</code></td><td>Signal loss</td><td>No GPS or SIM ping for &gt; 180 min</td><td><span class="chip med">Medium</span></td></tr>
+              <tr><td><code>EX-04</code></td><td>Route deviation</td><td>&gt; 25 km off the planned polyline</td><td><span class="chip high">High</span></td></tr>
+              <tr><td><code>EX-05</code></td><td>Detention at origin</td><td>Gate-in to gate-out &gt; 8 h free time</td><td><span class="chip med">Medium</span></td></tr>
+              <tr><td><code>EX-06</code></td><td>Detention at destination</td><td>Arrival to unload complete &gt; 6 h</td><td><span class="chip med">Medium</span></td></tr>
+              <tr><td><code>EX-07</code></td><td>E-way bill expiry risk</td><td>Validity left &lt; 6 h with distance still to run</td><td><span class="chip crit">Critical</span></td></tr>
+              <tr><td><code>EX-08</code></td><td>Night halt overrun</td><td>Rest window exceeded by &gt; 3 h</td><td><span class="chip low">Low</span></td></tr>
+              <tr><td><code>EX-09</code></td><td>Temperature excursion</td><td>Reefer outside band for &gt; 15 min</td><td><span class="chip crit">Critical</span></td></tr>
+              <tr><td><code>EX-10</code></td><td>Payload variance</td><td>Weighbridge vs. indented tonnage beyond tolerance</td><td><span class="chip low">Low</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="split">
+        <div class="panel">
+          <div class="panel-head">Files</div>
+          <div class="panel-body">
+            <p class="files"><b>src/sim/</b>
+  clock.ts · tick.ts
+  movement.ts · eta.ts
+  rules/ex01…ex10.ts
+  rules/index.ts
+  worker.ts
+<b>src/store/</b>simStore.ts</p>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head">Done when</div>
+          <div class="panel-body">
+            <ul class="checks">
+              <li>Runs 600× for 10 minutes without drift or memory growth</li>
+              <li>Every rule has a unit test with a fixture trip</li>
+              <li>Pausing freezes positions, ETAs and ages together</li>
+              <li>Main thread stays under 8 ms per frame at 1,200 trips</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="proves">
+        <span class="lbl">Signal</span>
+        <p>Systems thinking, not just view code. A tick loop, a worker boundary and a pure rules layer are the parts of frontend that most portfolios never touch.</p>
+      </div>
+    </article>
+
+    <!-- P3 -->
+    <article class="phase" id="p3">
+      <div class="node">03</div>
+      <div class="phase-head">
+        <h3>India map renderer</h3>
+        <span class="est">2 days</span>
+      </div>
+      <p class="objective">
+        Draw the country and the fleet on it, from scratch — no Mapbox, no Leaflet, no tile
+        server. The map is the centrepiece and it should be visibly ours.
+      </p>
+
+      <div class="callout">
+        <p>
+          <strong>Deliberate constraint:</strong> hand-rolling the projection and renderer is
+          the single highest-signal decision in this build. Anyone can drop in a map library.
+          Writing a Mercator projection, a quadtree for hit-testing and a canvas draw loop is
+          a different conversation in an interview.
+        </p>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">Build</div>
+        <div class="panel-body">
+          <ul class="build">
+            <li><b>Boundary data</b> — real Indian state geometry, simplified with Douglas–Peucker to roughly 40 KB and committed to the repo, so the map has no runtime network dependency.</li>
+            <li><b>Projection</b> — Web Mercator forward and inverse, with pan and zoom as a single transform matrix; screen ↔ lat/lng conversion used by both rendering and hit-testing.</li>
+            <li><b>Two-layer render</b> — static geography on an SVG layer, moving fleet on a Canvas layer above it. Canvas because 1,200 markers as DOM nodes will not hold 60 fps.</li>
+            <li><b>Markers</b> — heading-rotated truck glyphs coloured by severity, with a pulse on freshly raised critical exceptions.</li>
+            <li><b>Clustering</b> — grid clustering below zoom 5 with a count badge; expands on zoom-in.</li>
+            <li><b>Hit-testing</b> — quadtree over screen positions for hover and click at cursor speed, rebuilt on transform change rather than per frame.</li>
+            <li><b>Layers</b> — toggles for lane arcs, plants and warehouses, exceptions-only, and a delay heat overlay by corridor.</li>
+            <li><b>Interaction</b> — hover card with LR number, vehicle, transporter and ETA delta; click selects the trip and syncs the table and queue.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="split">
+        <div class="panel">
+          <div class="panel-head">Files</div>
+          <div class="panel-body">
+            <p class="files"><b>src/map/</b>
+  projection.ts
+  quadtree.ts
+  geography.svg.tsx
+  fleetCanvas.tsx
+  clustering.ts
+  layers.tsx
+<b>src/data/</b>india.simplified.json</p>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head">Done when</div>
+          <div class="panel-body">
+            <ul class="checks">
+              <li>60 fps panning and zooming with 1,200 live markers</li>
+              <li>Hover resolves in under 1 ms via the quadtree</li>
+              <li>Coordinates round-trip through projection and inverse within 0.01°</li>
+              <li>Map is keyboard-pannable and markers reachable via a list alternative</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="proves">
+        <span class="lbl">Signal</span>
+        <p>Canvas, geometry and performance work under a real constraint — the hardest thing in the build, and the part an interviewer will most want to talk about.</p>
+      </div>
+    </article>
+
+    <!-- P4 -->
+    <article class="phase" id="p4">
+      <div class="node">04</div>
+      <div class="phase-head">
+        <h3>The control tower screen</h3>
+        <span class="est">2 days</span>
+      </div>
+      <p class="objective">
+        Assemble the operating surface: summary above detail, exceptions triaged, and a
+        thousand-row table that never drops a frame.
+      </p>
+
+      <div class="panel">
+        <div class="panel-head">Build</div>
+        <div class="panel-body">
+          <ul class="build">
+            <li><b>KPI strip</b> — in transit, on-time delivery %, at risk, delivered today, average delay (h), visibility %. Each tile carries a sparkline of the last 24 sim-hours and a delta against the prior period. Clicking a tile filters everything below it.</li>
+            <li><b>Exception queue</b> — severity-ordered, grouped by code, with triage actions: acknowledge, assign to a controller, snooze with a reason, resolve with a resolution code. Ageing timers turn amber then red.</li>
+            <li><b>Trip table</b> — virtualised rows over the full fleet: LR no., lane, transporter, vehicle, status, ETA, delay, exception chips, last ping age. Sortable, multi-column filter, column show/hide, and saved views persisted to localStorage.</li>
+            <li><b>Filter model</b> — one composable filter object shared by map, queue, table and KPI strip, so the four panes never disagree about what the user is looking at.</li>
+            <li><b>Command palette</b> — <code>Cmd/Ctrl + K</code> for jump-to-trip by LR or vehicle number, jump-to-transporter, and switching saved views.</li>
+            <li><b>Layout</b> — resizable split: map on the left, queue on the right, table docked below with a drag handle and a collapse-to-map mode.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="split">
+        <div class="panel">
+          <div class="panel-head">Files</div>
+          <div class="panel-body">
+            <p class="files"><b>src/features/track/</b>
+  ControlTower.tsx
+  KpiStrip.tsx · Sparkline.tsx
+  ExceptionQueue.tsx
+  TripTable.tsx
+  useVirtualRows.ts
+  filters.ts
+<b>src/ui/</b>CommandPalette.tsx</p>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head">Done when</div>
+          <div class="panel-body">
+            <ul class="checks">
+              <li>Scrolling 1,200 rows holds 60 fps; only visible rows mount</li>
+              <li>Selecting on the map highlights in the table and vice versa</li>
+              <li>Filters compose — lane + severity + transporter simultaneously</li>
+              <li>Saved views survive a reload</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="proves">
+        <span class="lbl">Signal</span>
+        <p>Information design under density — deciding what earns space on a screen an operator stares at all day, and keeping four synchronised views honest.</p>
+      </div>
+    </article>
+
+    <!-- P5 -->
+    <article class="phase" id="p5">
+      <div class="node">05</div>
+      <div class="phase-head">
+        <h3>Trip detail &amp; documents</h3>
+        <span class="est">1 day</span>
+      </div>
+      <p class="objective">
+        The drill-down. When a controller clicks a flagged trip, everything needed to make
+        the next call is on one surface.
+      </p>
+
+      <div class="panel">
+        <div class="panel-head">Build</div>
+        <div class="panel-body">
+          <ul class="build">
+            <li><b>Milestone timeline</b> — the eleven-step sequence with actual against planned timestamps, dwell time called out at each node, and future steps shown as projections.</li>
+            <li><b>Ping trail</b> — inset map of the route travelled with toll-plaza pings plotted, gaps in coverage rendered as dashed segments rather than silently interpolated.</li>
+            <li><b>Documents</b> — LR, e-way bill with a live validity countdown, GST invoice, weighbridge slip, POD, each with status and a viewer.</li>
+            <li><b>Telemetry charts</b> — speed and, for reefers, temperature against the permitted band, drawn as custom SVG with the excursion window shaded.</li>
+            <li><b>Exception history</b> — every exception this trip has raised, with who acknowledged it and when.</li>
+            <li><b>Actions</b> — notify transporter, revise ETA, raise a manual exception, add a controller note. Each writes to the event log and shows an optimistic update with rollback on simulated failure.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="split">
+        <div class="panel">
+          <div class="panel-head">Files</div>
+          <div class="panel-body">
+            <p class="files"><b>src/features/trip/</b>
+  TripDetail.tsx
+  Timeline.tsx
+  PingTrail.tsx
+  DocumentPanel.tsx
+  EwayCountdown.tsx
+  TelemetryChart.tsx
+  actions.ts</p>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head">Done when</div>
+          <div class="panel-body">
+            <ul class="checks">
+              <li>Deep link <code>/track/:tripId</code> opens the detail cold</li>
+              <li>Countdown stays in step with the sim clock at every speed</li>
+              <li>Actions optimistically update and roll back cleanly on failure</li>
+              <li>Drawer traps focus and restores it on close</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="proves">
+        <span class="lbl">Signal</span>
+        <p>That you design for the decision, not the data dump — and that you handle optimistic state and rollback properly.</p>
+      </div>
+    </article>
+
+    <!-- P6 -->
+    <article class="phase" id="p6">
+      <div class="node">06</div>
+      <div class="phase-head">
+        <h3>Pulse — performance analytics</h3>
+        <span class="est">1 day</span>
+      </div>
+      <p class="objective">
+        Turn the accumulated event log into the review a logistics head actually runs:
+        who is failing, on which lanes, and what it costs.
+      </p>
+
+      <div class="panel">
+        <div class="panel-head">Build</div>
+        <div class="panel-body">
+          <ul class="build">
+            <li><b>Transporter scorecard</b> — on-time delivery %, acceptance rate, average delay, detention hours and exception rate per transporter, sortable and rankable.</li>
+            <li><b>Lane heat table</b> — corridors as rows, weeks as columns, cells shaded by on-time performance, with volume as a secondary encoding.</li>
+            <li><b>Delay Pareto</b> — root-cause breakdown by exception code with a cumulative line, answering “which two problems cause most of our misses”.</li>
+            <li><b>Cost view</b> — freight cost per MT and per BTKM by lane, the unit FreightFox itself reports against, with a detention-cost estimate layered on.</li>
+            <li><b>Charts</b> — all hand-drawn SVG on a shared scale module: one axis system, tabular figures, theme-aware label colours, no charting dependency.</li>
+            <li><b>Period compare</b> — this week against last, with deltas rendered as signed values in the semantic colours.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="split">
+        <div class="panel">
+          <div class="panel-head">Files</div>
+          <div class="panel-body">
+            <p class="files"><b>src/features/pulse/</b>
+  Pulse.tsx
+  Scorecard.tsx
+  LaneHeatTable.tsx
+  DelayPareto.tsx
+  CostPerBtkm.tsx
+<b>src/charts/</b>
+  scale.ts · axis.tsx
+  bars.tsx · line.tsx</p>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head">Done when</div>
+          <div class="panel-body">
+            <ul class="checks">
+              <li>Every aggregate derives from the event log, nothing precomputed</li>
+              <li>Charts read correctly in both themes</li>
+              <li>Every axis label names a value the chart actually reaches</li>
+              <li>Recompute of all views under 40 ms</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="proves">
+        <span class="lbl">Signal</span>
+        <p>Data visualisation without reaching for a library, and the judgement to pick metrics the customer already reports on.</p>
+      </div>
+    </article>
+
+    <!-- P7 -->
+    <article class="phase" id="p7">
+      <div class="node">07</div>
+      <div class="phase-head">
+        <h3>Accessibility, performance &amp; ship</h3>
+        <span class="est">1.5 days</span>
+      </div>
+      <p class="objective">
+        Close the gap between “demo that works” and “work someone would merge”.
+      </p>
+
+      <div class="panel">
+        <div class="panel-head">Build</div>
+        <div class="panel-body">
+          <ul class="build">
+            <li><b>Keyboard</b> — full traversal of the table with arrow keys and type-ahead, roving tabindex in the exception queue, escape-to-close everywhere, and a discoverable shortcut sheet.</li>
+            <li><b>Screen readers</b> — the map gets an equivalent list view; the exception queue announces new criticals through a polite live region; the table uses proper grid semantics rather than divs.</li>
+            <li><b>Motion</b> — <code>prefers-reduced-motion</code> stops marker animation and pulses without stopping the simulation.</li>
+            <li><b>Performance budget</b> — sub-2 s cold load, under 220 KB gzipped JS, no long task over 50 ms during a 60× run. Measured and written down, not assumed.</li>
+            <li><b>Resilience</b> — error boundary per pane so a chart failure never blanks the console; loading skeletons; genuine empty states with a way out.</li>
+            <li><b>Responsive</b> — down to tablet at 1024, where the table becomes the primary surface and the map collapses to a summary.</li>
+            <li><b>Ship</b> — deploy to Vercel, README with architecture notes and the reasoning behind the map decision, plus a two-minute walkthrough recording.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="split">
+        <div class="panel">
+          <div class="panel-head">Files</div>
+          <div class="panel-body">
+            <p class="files"><b>src/a11y/</b>
+  liveRegion.tsx
+  MapListView.tsx
+  ShortcutSheet.tsx
+<b>src/ui/</b>ErrorBoundary.tsx
+<b>/</b>README.md
+  PERFORMANCE.md</p>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head">Done when</div>
+          <div class="panel-body">
+            <ul class="checks">
+              <li>Lighthouse accessibility 95+ and zero axe violations</li>
+              <li>Entire app operable without a mouse</li>
+              <li>Performance budget met and documented with numbers</li>
+              <li>Deployed, README written, walkthrough recorded</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="proves">
+        <span class="lbl">Signal</span>
+        <p>Seniority. Most candidates stop at phase 4 — accessibility and a measured performance budget are what say this person ships production code.</p>
+      </div>
+    </article>
+  </section>
+
+  <!-- ============ KPI DEFINITIONS ============ -->
+  <section id="metrics">
+    <h2>Metric definitions</h2>
+    <p class="sec-note">
+      Fixed up front so the KPI strip, trip detail and Pulse never compute the same figure
+      two different ways. BTKM is FreightFox's own reporting unit.
+    </p>
+    <div class="tscroll">
+      <table>
+        <thead>
+          <tr><th>Metric</th><th>Definition</th><th>Surfaces on</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>On-time delivery</td><td>Trips delivered within SLA commit ÷ total delivered, over the selected window</td><td>KPI strip · scorecard</td></tr>
+          <tr><td>Visibility %</td><td>Active trips with a ping in the last 3 h ÷ all active trips</td><td>KPI strip</td></tr>
+          <tr><td>At risk</td><td>In-transit trips carrying an open high or critical exception</td><td>KPI strip · queue</td></tr>
+          <tr><td>Average delay</td><td>Mean of (projected or actual arrival − SLA commit) across late trips, in hours</td><td>KPI strip · Pareto</td></tr>
+          <tr><td>Detention hours</td><td>Time at a node beyond contracted free time, origin and destination summed</td><td>Scorecard · cost view</td></tr>
+          <tr><td>Cost per BTKM</td><td>Freight cost ÷ (billed tonnes × kilometres run)</td><td>Cost view</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============ SCOPE ============ -->
+  <section id="scope">
+    <h2>Deliberately out of scope</h2>
+    <p class="sec-note">
+      Naming what we are not building is what keeps eleven days from becoming eleven weeks.
+    </p>
+    <div class="split">
+      <div class="panel">
+        <div class="panel-head">Not building</div>
+        <div class="panel-body">
+          <ul class="build">
+            <li>Any backend, database or auth — the simulation is the source of truth</li>
+            <li>The other five FreightFox modules beyond visible stubs in the rail</li>
+            <li>Mobile phone layouts; tablet at 1024 is the floor</li>
+            <li>Real carrier integrations, GPS vendors or FASTag feeds</li>
+            <li>Multi-tenant or role-based permissions</li>
+          </ul>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">If there is time after phase 7</div>
+        <div class="panel-body">
+          <ul class="build">
+            <li>A live spot-auction screen from the Procure module — countdown, bid grid, rank reveal</li>
+            <li>A rebuild of their public payload simulator, as a second smaller piece</li>
+            <li>Natural-language filtering of the trip table, echoing their Nubra AI positioning</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span>Control Tower · build spec rev 01</span>
+    <span>Research sourced from freightfox.ai, Sep 2026</span>
+    <span>Next: phase 00</span>
+  </footer>
+
+</div>
+
+<script>
+  (function () {
+    var links = Array.prototype.slice.call(document.querySelectorAll('.phase-link'));
+    var phases = links.map(function (l) { return document.querySelector(l.getAttribute('href')); });
+    if (!('IntersectionObserver' in window)) return;
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        var i = phases.indexOf(e.target);
+        if (i < 0) return;
+        links.forEach(function (l, j) {
+          l.style.background = j === i ? 'var(--surface-2)' : 'var(--surface)';
+        });
+      });
+    }, { rootMargin: '-25% 0px -60% 0px' });
+    phases.forEach(function (p) { if (p) io.observe(p); });
+  })();
+</script>
